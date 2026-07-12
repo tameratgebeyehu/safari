@@ -51,10 +51,5 @@
     "experiments": {
       "typedRoutes": true
     },
-    "extra": {
-      "eas": {
-        "projectId": "safari-a-v1"
-      }
-    }
   }
 }
