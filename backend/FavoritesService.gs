@@ -32,7 +32,7 @@ function rowToFavorite(row) {
     phoneNumber:  String(row[1]),
     customerName: String(row[2]),
     description:  String(row[3] || ''),
-    createdDate:  String(row[4]),
+    createdDate:  cleanString(row[4], 'date'),
   };
 }
 

@@ -1,3 +1,5 @@
+import i18n from '../i18n';
+
 const ETHIOPIAN_MONTHS = [
   'Meskerem',
   'Tikimt',
@@ -30,24 +32,88 @@ export interface EthiopianDateTime {
   isoTimestamp: string;
 }
 
-function gregorianToEthiopian(year: number, month: number, day: number) {
-  const jd =
-    Math.floor((1461 * (year + 4800 + Math.floor((month - 14) / 12))) / 4) +
-    Math.floor((367 * (month - 2 - 12 * Math.floor((month - 14) / 12))) / 12) -
-    Math.floor(
-      (3 * Math.floor((year + 4900 + Math.floor((month - 14) / 12)) / 100)) / 4
-    ) +
-    day -
-    32075;
+// -----------------------------------------------------------------
+// Correct Gregorian → Ethiopian conversion
+// Based on the Zenysis/ethiopian-date algorithm (production-tested)
+// -----------------------------------------------------------------
+const _startDayOfEthiopian = (year: number): number => {
+  const newYearDay = Math.floor(year / 100) - Math.floor(year / 400) - 4;
+  return (year - 1) % 4 === 3 ? newYearDay + 1 : newYearDay;
+};
 
-  const r = (jd - 1723856) % 1461;
-  const n = Math.floor(r / 365) + Math.floor(r / 1460);
-  const ethYear = 4 * Math.floor((jd - 1723856) / 1461) + n + (n < 0 ? 0 : 1);
-  const ethDayOfYear = jd - (1723856 + 365 * (ethYear - 1) + Math.floor((ethYear - 1) / 4));
-  const ethMonth = Math.floor(ethDayOfYear / 30) + 1;
-  const ethDay = (ethDayOfYear % 30) + 1;
+function gregorianToEthiopian(
+  year: number,
+  month: number,
+  date: number
+): { year: number; month: number; day: number } {
+  // Number of days in Gregorian months (Jan = 1)
+  const gregorianMonths = [0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
 
-  return { year: ethYear, month: ethMonth, day: ethDay };
+  // Number of days in Ethiopian months (Jan = 1)
+  // Index 10 = Pagumen (5 or 6 days)
+  const ethiopianMonths = [0, 30, 30, 30, 30, 30, 30, 30, 30, 30, 5, 30, 30, 30, 30];
+
+  // Gregorian leap year → Feb has 29 days
+  if ((year % 4 === 0 && year % 100 !== 0) || year % 400 === 0) {
+    gregorianMonths[2] = 29;
+  }
+
+  // September sees 8-year difference
+  let ethiopianYear = year - 8;
+
+  // Ethiopian leap year → Pagumen has 6 days
+  if (ethiopianYear % 4 === 3) {
+    ethiopianMonths[10] = 6;
+  }
+
+  // Ethiopian new year day in Gregorian calendar
+  const newYearDay = _startDayOfEthiopian(year - 8);
+
+  // Count total Gregorian days up to the given date
+  let until = 0;
+  for (let i = 1; i < month; i++) {
+    until += gregorianMonths[i]!;
+  }
+  until += date;
+
+  // Compute tahissas offset (December alignment)
+  let tahissas = ethiopianYear % 4 === 0 ? 26 : 25;
+
+  if (year < 1582) {
+    ethiopianMonths[1] = 0;
+    ethiopianMonths[2] = tahissas;
+  } else if (until <= 277 && year === 1582) {
+    ethiopianMonths[1] = 0;
+    ethiopianMonths[2] = tahissas;
+  } else {
+    tahissas = newYearDay - 3;
+    ethiopianMonths[1] = tahissas;
+  }
+
+  // Find which Ethiopian month/day corresponds
+  let m = 1;
+  let ethiopianDate = 1;
+  for (m = 1; m < ethiopianMonths.length; m++) {
+    const daysInMonth = ethiopianMonths[m] ?? 0;
+    if (until <= daysInMonth) {
+      ethiopianDate =
+        m === 1 || daysInMonth === 0 ? until + (30 - tahissas) : until;
+      break;
+    } else {
+      until -= daysInMonth;
+    }
+  }
+
+  // If m > 10, we're already in the next Ethiopian year
+  if (m > 10) {
+    ethiopianYear += 1;
+  }
+
+  // Ethiopian months ordered according to Gregorian index
+  const order = [0, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 1, 2, 3, 4];
+  const ethiopianMonth = order[m] ?? 1;
+
+  return { year: ethiopianYear, month: ethiopianMonth, day: ethiopianDate };
 }
 
 export function getEthiopianDateTime(date: Date = new Date()): EthiopianDateTime {
@@ -59,12 +125,23 @@ export function getEthiopianDateTime(date: Date = new Date()): EthiopianDateTime
   const monthName = ETHIOPIAN_MONTHS[eth.month - 1] ?? 'Unknown';
   const dayName = ETHIOPIAN_DAYS[date.getDay()] ?? '';
 
-  const hours = date.getHours().toString().padStart(2, '0');
-  const minutes = date.getMinutes().toString().padStart(2, '0');
+  // Use 12-hour Ethiopian clock (Habesha time: offset by 6 hours)
+  const localHours = date.getHours();
+  const localMinutes = date.getMinutes();
+
+  // Convert to Ethiopian (Habesha) clock: 6 AM Gregorian = 12:00 Ethiopian
+  let ethHour = (localHours + 18) % 12;
+  if (ethHour === 0) ethHour = 12;
+  
+  const periodKey = localHours < 6 || localHours >= 18 ? 'time.night' : localHours < 12 ? 'time.morning' : 'time.afternoon';
+  const period = i18n.isInitialized ? i18n.t(periodKey) : (localHours < 6 || localHours >= 18 ? 'ሌሊት' : localHours < 12 ? 'ጠዋት' : 'ከሰዓት');
+
+  const hh = ethHour.toString().padStart(2, '0');
+  const mm = localMinutes.toString().padStart(2, '0');
 
   return {
     ethiopianDate: `${dayName}, ${eth.day} ${monthName} ${eth.year}`,
-    ethiopianTime: `${hours}:${minutes}`,
+    ethiopianTime: `${hh}:${mm} ${period}`,
     isoTimestamp: date.toISOString(),
   };
 }

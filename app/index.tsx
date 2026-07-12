@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Image, Pressable, StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
 import { Button, Card, Text, useTheme } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -11,7 +11,7 @@ import { spacing, borderRadius, typography } from '../src/theme/colors';
 export default function WelcomeScreen() {
   const theme = useTheme();
   const { t } = useTranslation();
-  const { hasLaunched, userMode, setUserMode, setHasLaunched, hydrate, setPinVerified } =
+  const { hasLaunched, userMode, setUserMode, setHasLaunched, hydrate, setPinVerified, language, setLanguage } =
     useAppStore();
   const [selectedMode, setSelectedMode] = useState<UserMode | null>(null);
   const [ready, setReady] = useState(false);
@@ -42,15 +42,26 @@ export default function WelcomeScreen() {
   if (!ready || (hasLaunched && userMode)) {
     return (
       <View style={[styles.loading, { backgroundColor: theme.colors.background }]}>
-        <Text style={{ fontSize: 48 }}>🦁</Text>
+        <Image source={require('../assets/logo.png')} style={styles.splashLogo} resizeMode="contain" />
       </View>
     );
   }
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      <View style={styles.topBar}>
+        <Button
+          mode="outlined"
+          onPress={() => setLanguage(language === 'en' ? 'am' : 'en')}
+          style={{ borderColor: theme.colors.outlineVariant, borderRadius: 20 }}
+          labelStyle={{ fontWeight: '800', fontSize: 13 }}
+        >
+          {language === 'en' ? 'አማርኛ (Amharic)' : 'English'}
+        </Button>
+      </View>
+
       <View style={styles.header}>
-        <Text style={styles.logo}>🦁</Text>
+        <Image source={require('../assets/logo.png')} style={styles.logoImage} resizeMode="contain" />
         <Text variant="displaySmall" style={[styles.title, { color: theme.colors.primary }]}>
           {t('common.appName')}
         </Text>
@@ -132,7 +143,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: spacing.lg,
-    justifyContent: 'space-between',
+    paddingTop: 4,
   },
   loading: {
     flex: 1,
@@ -143,9 +154,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: spacing.xxl,
   },
-  logo: {
-    fontSize: 72,
+  logoImage: {
+    width: 96,
+    height: 96,
     marginBottom: spacing.md,
+    borderRadius: 22,
+  },
+  splashLogo: {
+    width: 120,
+    height: 120,
+    borderRadius: 26,
   },
   title: {
     fontWeight: '800',
@@ -183,7 +201,12 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
   },
   continueLabel: {
-    fontSize: typography.body + 2,
+    fontSize: 16,
     fontWeight: '700',
+  },
+  topBar: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    paddingTop: spacing.xs,
   },
 });

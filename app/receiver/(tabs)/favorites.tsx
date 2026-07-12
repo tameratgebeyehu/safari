@@ -1,12 +1,12 @@
-import React, { useMemo, useState } from 'react';
-import { FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
+import React, { useLayoutEffect, useMemo, useState } from 'react';
+import { FlatList, Pressable, RefreshControl, StyleSheet, TextInput as RNTextInput, View } from 'react-native';
+import { useNavigation } from 'expo-router';
 import {
   Avatar,
   Button,
   Dialog,
   FAB,
   Portal,
-  Searchbar,
   Snackbar,
   Text,
   TextInput,
@@ -60,6 +60,25 @@ export default function FavoritesScreen() {
   const deleteFavorite = useDeleteFavorite();
 
   const [search, setSearch] = useState('');
+  const [searchVisible, setSearchVisible] = useState(false);
+  const navigation = useNavigation();
+
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerRight: () => (
+        <Pressable
+          onPress={() => { setSearchVisible((v) => !v); setSearch(''); }}
+          style={{ marginRight: 12, padding: 4 }}
+        >
+          <MaterialCommunityIcons
+            name={searchVisible ? 'close' : 'magnify'}
+            size={22}
+            color={searchVisible ? colors.primary : theme.colors.onSurface}
+          />
+        </Pressable>
+      ),
+    });
+  }, [navigation, searchVisible, theme.colors.onSurface]);
   const [dialogVisible, setDialogVisible] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Favorite | null>(null);
   const [editing, setEditing] = useState<Favorite | null>(null);
@@ -98,33 +117,45 @@ export default function FavoritesScreen() {
   const handleSave = async () => {
     if (!isValidEthiopianPhone(phone) || !customerName.trim()) return;
 
-    if (editing) {
-      await updateFavorite.mutateAsync({
-        favoriteId: editing.favoriteId,
-        phoneNumber: normalizePhoneNumber(phone),
-        customerName: customerName.trim(),
-        description: description.trim(),
-        userMode: 'receiver',
-      });
-    } else {
-      const now = new Date();
-      await createFavorite.mutateAsync({
-        favoriteId: generateFavoriteId(),
-        phoneNumber: normalizePhoneNumber(phone),
-        customerName: customerName.trim(),
-        description: description.trim(),
-        createdDate: now.toISOString().split('T')[0],
-        userMode: 'receiver',
-      });
+    try {
+      if (editing) {
+        await updateFavorite.mutateAsync({
+          favoriteId: editing.favoriteId,
+          phoneNumber: normalizePhoneNumber(phone),
+          customerName: customerName.trim(),
+          description: description.trim(),
+          userMode: 'receiver',
+        });
+        setSnackbar(t('favorites.updated') || 'Favorite updated');
+      } else {
+        const now = new Date();
+        await createFavorite.mutateAsync({
+          favoriteId: generateFavoriteId(),
+          phoneNumber: normalizePhoneNumber(phone),
+          customerName: customerName.trim(),
+          description: description.trim(),
+          createdDate: now.toISOString().split('T')[0],
+          userMode: 'receiver',
+        });
+        setSnackbar(t('favorites.created') || 'Favorite added');
+      }
+    } catch (err: any) {
+      setSnackbar(err.message || 'Operation failed');
+    } finally {
+      setDialogVisible(false);
     }
-
-    setDialogVisible(false);
   };
 
   const handleDeleteConfirm = async () => {
     if (!deleteTarget) return;
-    await deleteFavorite.mutateAsync(deleteTarget.favoriteId);
-    setDeleteTarget(null);
+    try {
+      await deleteFavorite.mutateAsync(deleteTarget.favoriteId);
+      setSnackbar(t('favorites.deleted') || 'Favorite deleted');
+    } catch (err: any) {
+      setSnackbar(err.message || 'Failed to delete favorite');
+    } finally {
+      setDeleteTarget(null);
+    }
   };
 
   const copyPhone = async (phone: string) => {
@@ -135,12 +166,6 @@ export default function FavoritesScreen() {
   if (isLoading && !favorites) {
     return (
       <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
-        <Searchbar
-          placeholder={t('favorites.searchPlaceholder')}
-          onChangeText={setSearch}
-          value={search}
-          style={[styles.search, { backgroundColor: theme.colors.surface }]}
-        />
         <View style={styles.listPadding}>
           <SkeletonList count={5} />
         </View>
@@ -150,12 +175,24 @@ export default function FavoritesScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      <Searchbar
-        placeholder={t('favorites.searchPlaceholder')}
-        onChangeText={setSearch}
-        value={search}
-        style={[styles.search, { backgroundColor: theme.colors.surface }]}
-      />
+      {searchVisible && (
+        <View style={[styles.searchContainer, { backgroundColor: theme.colors.surface, borderBottomColor: theme.colors.outline + '30' }]}>
+          <MaterialCommunityIcons name="magnify" size={18} color={theme.colors.onSurfaceVariant} />
+          <RNTextInput
+            placeholder={t('favorites.searchPlaceholder')}
+            placeholderTextColor={theme.colors.onSurfaceVariant}
+            value={search}
+            onChangeText={setSearch}
+            autoFocus
+            style={[styles.searchInput, { color: theme.colors.onSurface }]}
+          />
+          {search.length > 0 && (
+            <Pressable onPress={() => setSearch('')}>
+              <MaterialCommunityIcons name="close-circle" size={16} color={theme.colors.onSurfaceVariant} />
+            </Pressable>
+          )}
+        </View>
+      )}
 
       <FlatList
         data={filtered}
@@ -244,10 +281,10 @@ export default function FavoritesScreen() {
                     <MaterialCommunityIcons name="pencil" size={18} color={colors.primary} />
                   </Pressable>
                   <Pressable
-                    style={[styles.iconBtn, { backgroundColor: colors.accent + '12' }]}
+                    style={[styles.iconBtn, { backgroundColor: colors.cancelled + '12' }]}
                     onPress={() => setDeleteTarget(item)}
                   >
-                    <MaterialCommunityIcons name="delete" size={18} color={colors.accent} />
+                    <MaterialCommunityIcons name="delete" size={18} color={colors.cancelled} />
                   </Pressable>
                 </View>
               </View>
@@ -283,7 +320,7 @@ export default function FavoritesScreen() {
           </Dialog.Content>
           <Dialog.Actions>
             <Button onPress={() => setDeleteTarget(null)}>{t('common.cancel')}</Button>
-            <Button mode="contained" buttonColor={colors.accent} onPress={handleDeleteConfirm} loading={deleteFavorite.isPending}>
+            <Button mode="contained" buttonColor={colors.cancelled} onPress={handleDeleteConfirm} loading={deleteFavorite.isPending}>
               {t('common.delete')}
             </Button>
           </Dialog.Actions>
@@ -299,7 +336,19 @@ export default function FavoritesScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  search: { margin: spacing.md },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderBottomWidth: 1,
+    gap: spacing.sm,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 15,
+    paddingVertical: 0,
+  },
   listPadding: { padding: spacing.md, paddingBottom: 80, flexGrow: 1 },
   card: {
     marginBottom: spacing.md,

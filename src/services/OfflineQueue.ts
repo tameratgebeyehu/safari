@@ -1,5 +1,11 @@
 import type { CreateRequestPayload, OfflineQueueItem } from '../api/types';
 import { getObject, setObject, StorageKeys } from '../storage/mmkv';
+import { sha256 } from '../security/crypto';
+
+export async function getQueueIntegrityHash(): Promise<string> {
+  const queue = getOfflineQueue();
+  return sha256(JSON.stringify(queue.map((i) => i.id + i.retries)));
+}
 
 export function getOfflineQueue(): OfflineQueueItem[] {
   return getObject<OfflineQueueItem[]>(StorageKeys.OFFLINE_QUEUE, []);

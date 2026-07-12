@@ -1,27 +1,35 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Animated, ScrollView, StyleSheet, TextInput as RNTextInput, View } from 'react-native';
-import { Button, IconButton, Snackbar, Text, TextInput, useTheme } from 'react-native-paper';
+import {
+  Animated,
+  Image,
+  ScrollView,
+  StyleSheet,
+  TextInput as RNTextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import { Snackbar, Text, useTheme } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { ConnectionIndicator } from '../../src/components/ConnectionIndicator';
-import { LatestRequestCard } from '../../src/components/LatestRequestCard';
-import { QUICK_AMOUNTS, MAX_DESCRIPTION_LENGTH } from '../../src/constants';
 import { useCreateRequest } from '../../src/hooks/useRequests';
 import { useLatestSenderRequest } from '../../src/hooks/useLatestSenderRequest';
 import { useAppStore } from '../../src/store/appStore';
 import { getEthiopianDateTime } from '../../src/utils/ethiopianDate';
 import { isValidEthiopianPhone, normalizePhoneNumber } from '../../src/utils/phone';
 import { generateRequestId } from '../../src/utils/requestId';
-import { spacing, borderRadius, typography, colors } from '../../src/theme/colors';
+import { QUICK_AMOUNTS } from '../../src/constants';
+import { colors, spacing, borderRadius } from '../../src/theme/colors';
+import { getStatusColor } from '../../src/utils/requestHelpers';
+import { formatPhoneDisplay } from '../../src/utils/phone';
 
-function getTimeBasedGreetingKey(): 'sender.greetingMorning' | 'sender.greetingAfternoon' | 'sender.greetingEvening' {
-  const hour = new Date().getHours();
-  if (hour >= 5 && hour < 12) return 'sender.greetingMorning';
-  if (hour >= 12 && hour < 17) return 'sender.greetingAfternoon';
-  return 'sender.greetingEvening';
-}
+const STATUS_ICONS: Record<string, string> = {
+  Pending: 'clock-outline',
+  Processing: 'progress-clock',
+  Completed: 'check-circle-outline',
+  Cancelled: 'close-circle-outline',
+};
 
 export default function SenderScreen() {
   const theme = useTheme();
@@ -30,59 +38,44 @@ export default function SenderScreen() {
 
   const [phone, setPhone] = useState('');
   const [amount, setAmount] = useState('');
-  const [description, setDescription] = useState('');
+  const description = '';
   const [phoneError, setPhoneError] = useState('');
   const [amountError, setAmountError] = useState('');
   const [snackbar, setSnackbar] = useState('');
   const [showSuccess, setShowSuccess] = useState(false);
-  const [dateTime, setDateTime] = useState(getEthiopianDateTime());
-  const [greetingKey] = useState(getTimeBasedGreetingKey());
 
-  const successScale = useRef(new Animated.Value(0)).current;
+  const successOpacity = useRef(new Animated.Value(0)).current;
   const createRequest = useCreateRequest();
-  const setLatestRequest = useAppStore((s) => s.setLatestRequest);
-
+  const { setLatestRequest, language, setLanguage } = useAppStore();
   const { latestRequest, statusChange, clearStatusChange } = useLatestSenderRequest();
 
+  // Status change notifications
   useEffect(() => {
     if (!statusChange) return;
-    if (statusChange === 'Completed') {
-      setSnackbar(t('sender.notificationCompleted'));
-    } else if (statusChange === 'Processing') {
-      setSnackbar(t('sender.notificationProcessing'));
-    } else if (statusChange === 'Cancelled') {
-      setSnackbar(t('sender.notificationCancelled'));
-    }
+    if (statusChange === 'Completed') setSnackbar(t('sender.notificationCompleted'));
+    else if (statusChange === 'Processing') setSnackbar(t('sender.notificationProcessing'));
+    else if (statusChange === 'Cancelled') setSnackbar(t('sender.notificationCancelled'));
     clearStatusChange();
-  }, [statusChange, t]);
+  }, [statusChange]);
 
-  // Auto-focus phone input on mount
+  // Auto-focus phone field
   useEffect(() => {
-    const timer = setTimeout(() => {
-      phoneRef.current?.focus();
-    }, 300);
+    const timer = setTimeout(() => phoneRef.current?.focus(), 300);
     return () => clearTimeout(timer);
   }, []);
 
-  // Update Ethiopian time every minute
-  useEffect(() => {
-    const interval = setInterval(() => setDateTime(getEthiopianDateTime()), 60000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const showSuccessAnimation = () => {
+  const showSuccessAnim = () => {
     setShowSuccess(true);
     Animated.sequence([
-      Animated.spring(successScale, { toValue: 1, useNativeDriver: true, tension: 60 }),
-      Animated.delay(1500),
-      Animated.timing(successScale, { toValue: 0, duration: 300, useNativeDriver: true }),
+      Animated.timing(successOpacity, { toValue: 1, duration: 200, useNativeDriver: true }),
+      Animated.delay(1400),
+      Animated.timing(successOpacity, { toValue: 0, duration: 300, useNativeDriver: true }),
     ]).start(() => setShowSuccess(false));
   };
 
   const clearFields = useCallback(() => {
     setPhone('');
     setAmount('');
-    setDescription('');
     setPhoneError('');
     setAmountError('');
     setTimeout(() => phoneRef.current?.focus(), 100);
@@ -96,21 +89,18 @@ export default function SenderScreen() {
     } else {
       setPhoneError('');
     }
-
-    const amountNum = parseInt(amount, 10);
-    if (!amount || isNaN(amountNum) || amountNum <= 0) {
+    const n = parseInt(amount, 10);
+    if (!amount || isNaN(n) || n <= 0) {
       setAmountError(t('sender.amountError'));
       valid = false;
     } else {
       setAmountError('');
     }
-
     return valid;
   };
 
   const handleSend = async () => {
     if (!validate() || createRequest.isPending) return;
-
     const ethDateTime = getEthiopianDateTime();
     const payload = {
       requestId: generateRequestId(),
@@ -122,7 +112,6 @@ export default function SenderScreen() {
       isoTimestamp: ethDateTime.isoTimestamp,
       userMode: 'sender',
     };
-
     try {
       const result = await createRequest.mutateAsync(payload);
       setLatestRequest({
@@ -133,173 +122,263 @@ export default function SenderScreen() {
         createdTime: result.createdTime,
         status: result.status,
       });
-      if (result.pendingSync) {
-        setSnackbar(t('sender.savedOffline'));
-      } else {
-        setSnackbar(t('sender.success'));
-        showSuccessAnimation();
-      }
+      setSnackbar(result.pendingSync ? t('sender.savedOffline') : t('sender.success'));
+      if (!result.pendingSync) showSuccessAnim();
       clearFields();
     } catch {
       setSnackbar(t('common.error'));
     }
   };
 
-  const handleCancel = () => {
+  const handleClear = () => {
     clearFields();
     setSnackbar(t('sender.clearFields'));
   };
 
+  const statusColor = latestRequest ? getStatusColor(latestRequest.status) : colors.pending;
+  const statusIcon = latestRequest ? (STATUS_ICONS[latestRequest.status] || 'help-circle-outline') : '';
+
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
-        {/* Header */}
-        <View style={styles.header}>
-          <IconButton
-            icon="history"
-            size={28}
-            onPress={() => router.push('/sender/history' as any)}
-            style={styles.historyBtn}
-            iconColor={theme.colors.primary}
-          />
-          <Text style={styles.logo}>🦁</Text>
-          <Text variant="headlineMedium" style={{ color: theme.colors.primary, fontWeight: '700' }}>
+    <SafeAreaView style={[styles.root, { backgroundColor: theme.colors.background }]}>
+      {/* ── Header ── */}
+      <View style={[styles.header, { borderBottomColor: theme.colors.outlineVariant }]}>
+        <View style={styles.headerLeft}>
+          <Image source={require('../../assets/logo.png')} style={styles.headerLogo} resizeMode="contain" />
+          <Text style={[styles.headerTitle, { color: theme.colors.onSurface }]}>
             {t('common.appName')}
           </Text>
-          <Text variant="titleSmall" style={[styles.greeting, { color: theme.colors.onSurfaceVariant }]}>
-            {t(greetingKey)}
-          </Text>
-          <View style={styles.dateRow}>
-            <Text variant="bodyMedium" style={[styles.dateText, { color: theme.colors.onSurfaceVariant }]}>
-              📅 {dateTime.ethiopianDate}
-            </Text>
-            <Text variant="bodyMedium" style={[styles.dateText, { color: theme.colors.onSurfaceVariant }]}>
-              🕐 {dateTime.ethiopianTime}
-            </Text>
-          </View>
-          <ConnectionIndicator />
         </View>
+        <TouchableOpacity
+          style={styles.langToggleBtn}
+          onPress={() => setLanguage(language === 'en' ? 'am' : 'en')}
+        >
+          <Text style={[styles.langToggleText, { color: theme.colors.primary }]}>
+            {language === 'en' ? 'አማርኛ' : 'English'}
+          </Text>
+        </TouchableOpacity>
+      </View>
 
-        {/* Success Overlay */}
+      <ScrollView
+        contentContainerStyle={styles.scroll}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        {/* ── Success Banner ── */}
         {showSuccess && (
-          <Animated.View style={[styles.successBadge, { transform: [{ scale: successScale }] }]}>
-            <MaterialCommunityIcons name="check-circle" size={64} color={colors.success} />
-            <Text variant="titleMedium" style={{ color: colors.success, fontWeight: '700' }}>
+          <Animated.View
+            style={[styles.successBanner, { backgroundColor: colors.completed + '18', opacity: successOpacity }]}
+          >
+            <MaterialCommunityIcons name="check-circle" size={22} color={colors.completed} />
+            <Text style={[styles.successText, { color: colors.completed }]}>
               {t('sender.success')}
             </Text>
           </Animated.View>
         )}
 
-        {/* Phone Input */}
-        <TextInput
-          ref={phoneRef as never}
-          label={t('sender.phoneLabel')}
-          placeholder={t('sender.phonePlaceholder')}
-          value={phone}
-          onChangeText={(text) => {
-            setPhone(text.replace(/[^\d+]/g, ''));
-            if (phoneError) setPhoneError('');
-          }}
-          keyboardType="phone-pad"
-          mode="outlined"
-          error={!!phoneError}
-          style={styles.input}
-          contentStyle={styles.inputContent}
-          right={
-            phone.length > 0 ? (
-              <TextInput.Icon icon="close-circle" onPress={() => setPhone('')} />
-            ) : undefined
-          }
-        />
-        {phoneError ? <Text style={styles.error}>{phoneError}</Text> : null}
+        {/* ── Phone Field ── */}
+        <Text style={[styles.fieldLabel, { color: theme.colors.onSurface }]}>
+          {t('sender.phoneLabel')}
+        </Text>
+        <View
+          style={[
+            styles.inputBox,
+            {
+              borderColor: phoneError
+                ? colors.cancelled
+                : phone.length > 0
+                ? theme.colors.primary
+                : theme.colors.outline,
+              backgroundColor: theme.colors.surface,
+            },
+          ]}
+        >
+          <MaterialCommunityIcons
+            name="phone"
+            size={22}
+            color={phoneError ? colors.cancelled : theme.colors.onSurfaceVariant}
+            style={styles.inputIcon}
+          />
+          <RNTextInput
+            ref={phoneRef}
+            style={[styles.input, { color: theme.colors.onSurface }]}
+            placeholder={t('sender.phonePlaceholder')}
+            placeholderTextColor={theme.colors.onSurfaceVariant}
+            value={phone}
+            onChangeText={(t) => {
+              setPhone(t.replace(/[^\d+]/g, ''));
+              if (phoneError) setPhoneError('');
+            }}
+            keyboardType="phone-pad"
+            accessibilityLabel={t('sender.phoneLabel')}
+          />
+          {phone.length > 0 && (
+            <TouchableOpacity onPress={() => setPhone('')} style={styles.clearIcon}>
+              <MaterialCommunityIcons name="close-circle" size={20} color={theme.colors.onSurfaceVariant} />
+            </TouchableOpacity>
+          )}
+        </View>
+        {!!phoneError && (
+          <Text style={styles.errorText}>
+            <MaterialCommunityIcons name="alert-circle-outline" size={13} /> {phoneError}
+          </Text>
+        )}
 
-        {/* Quick Amount Buttons */}
-        <Text variant="titleMedium" style={[styles.sectionLabel, { color: theme.colors.onSurface }]}>
+        {/* ── Quick Amounts ── */}
+        <Text style={[styles.fieldLabel, { color: theme.colors.onSurface, marginTop: 20 }]}>
           {t('sender.amountLabel')}
         </Text>
-        <View style={styles.quickAmounts}>
-          {QUICK_AMOUNTS.map((value) => (
-            <Button
-              key={value}
-              mode={amount === String(value) ? 'contained' : 'outlined'}
-              onPress={() => {
-                setAmount(String(value));
-                if (amountError) setAmountError('');
-              }}
-              style={styles.amountBtn}
-              contentStyle={styles.amountBtnContent}
-              labelStyle={styles.amountBtnLabel}
-            >
-              {value} ETB
-            </Button>
-          ))}
+        <View style={styles.quickRow}>
+          {QUICK_AMOUNTS.map((val) => {
+            const selected = amount === String(val);
+            return (
+              <TouchableOpacity
+                key={val}
+                style={[
+                  styles.amountChip,
+                  {
+                    backgroundColor: selected ? theme.colors.primary : theme.colors.surface,
+                    borderColor: selected ? theme.colors.primary : theme.colors.outline,
+                  },
+                ]}
+                onPress={() => {
+                  setAmount(String(val));
+                  if (amountError) setAmountError('');
+                }}
+              >
+                <Text
+                  style={[
+                    styles.amountChipText,
+                    { color: selected ? '#fff' : theme.colors.onSurface },
+                  ]}
+                >
+                  {val}
+                </Text>
+                <Text
+                  style={[
+                    styles.amountChipUnit,
+                    { color: selected ? '#ffffffbb' : theme.colors.onSurfaceVariant },
+                  ]}
+                >
+                  {t('common.currency')}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
         </View>
 
-        {/* Manual Amount Input */}
-        <TextInput
-          label={t('sender.amountLabel')}
-          value={amount}
-          onChangeText={(text) => {
-            setAmount(text.replace(/\D/g, ''));
-            if (amountError) setAmountError('');
-          }}
-          keyboardType="number-pad"
-          mode="outlined"
-          error={!!amountError}
-          style={styles.input}
-          contentStyle={styles.inputContent}
-          right={<TextInput.Affix text="ETB" />}
-        />
-        {amountError ? <Text style={styles.error}>{amountError}</Text> : null}
+        {/* ── Manual Amount ── */}
+        <View
+          style={[
+            styles.inputBox,
+            {
+              borderColor: amountError
+                ? colors.cancelled
+                : amount.length > 0
+                ? theme.colors.primary
+                : theme.colors.outline,
+              backgroundColor: theme.colors.surface,
+            },
+          ]}
+        >
+          <MaterialCommunityIcons
+            name="cash"
+            size={22}
+            color={amountError ? colors.cancelled : theme.colors.onSurfaceVariant}
+            style={styles.inputIcon}
+          />
+          <RNTextInput
+            style={[styles.input, { color: theme.colors.onSurface }]}
+            placeholder={t('sender.amountHint')}
+            placeholderTextColor={theme.colors.onSurfaceVariant}
+            value={amount}
+            onChangeText={(t) => {
+              setAmount(t.replace(/\D/g, ''));
+              if (amountError) setAmountError('');
+            }}
+            keyboardType="number-pad"
+            accessibilityLabel={t('sender.amountLabel')}
+          />
+          <Text style={[styles.etbTag, { color: theme.colors.onSurfaceVariant }]}>{t('common.currency')}</Text>
+        </View>
+        {!!amountError && (
+          <Text style={styles.errorText}>
+            <MaterialCommunityIcons name="alert-circle-outline" size={13} /> {amountError}
+          </Text>
+        )}
 
-        {/* Description */}
-        <TextInput
-          label={t('sender.descriptionLabel')}
-          placeholder={t('sender.descriptionPlaceholder')}
-          value={description}
-          onChangeText={(text) => setDescription(text.slice(0, MAX_DESCRIPTION_LENGTH))}
-          mode="outlined"
-          multiline
-          maxLength={MAX_DESCRIPTION_LENGTH}
-          style={styles.input}
-          contentStyle={styles.descriptionContent}
-        />
-        <Text variant="labelSmall" style={[styles.charCount, { color: theme.colors.onSurfaceVariant }]}>
-          {description.length}/{MAX_DESCRIPTION_LENGTH}
-        </Text>
 
-        {/* Send Button */}
-        <Button
-          mode="contained"
+
+        {/* ── Send Button ── */}
+        <TouchableOpacity
+          style={[
+            styles.sendBtn,
+            {
+              backgroundColor: createRequest.isPending
+                ? theme.colors.surfaceVariant
+                : theme.colors.primary,
+            },
+          ]}
           onPress={handleSend}
-          loading={createRequest.isPending}
           disabled={createRequest.isPending}
-          style={[styles.sendBtn, { backgroundColor: colors.success }]}
-          contentStyle={styles.actionBtnContent}
-          labelStyle={styles.actionLabel}
-          icon="send"
+          accessibilityLabel={t('sender.send')}
         >
-          {createRequest.isPending ? t('sender.sending') : t('sender.send')}
-        </Button>
+          <MaterialCommunityIcons
+            name={createRequest.isPending ? 'loading' : 'send'}
+            size={22}
+            color="#fff"
+          />
+          <Text style={styles.sendBtnText}>
+            {createRequest.isPending ? t('sender.sending') : t('sender.send')}
+          </Text>
+        </TouchableOpacity>
 
-        {/* Cancel Button */}
-        <Button
-          mode="contained"
-          onPress={handleCancel}
+        {/* ── Clear Button ── */}
+        <TouchableOpacity
+          style={styles.clearBtn}
+          onPress={handleClear}
           disabled={createRequest.isPending}
-          style={[styles.cancelBtn, { backgroundColor: colors.accent }]}
-          contentStyle={styles.actionBtnContent}
-          labelStyle={styles.actionLabel}
-          icon="close"
+          accessibilityLabel={t('sender.clearBtn')}
         >
-          {t('sender.cancel')}
-        </Button>
+          <MaterialCommunityIcons name="refresh" size={18} color={theme.colors.onSurfaceVariant} />
+          <Text style={[styles.clearBtnText, { color: theme.colors.onSurfaceVariant }]}>
+            {t('sender.clearBtn')}
+          </Text>
+        </TouchableOpacity>
 
-        {/* Latest Request Status */}
-        {latestRequest && <LatestRequestCard request={latestRequest} />}
+        {/* ── Latest Request Card ── */}
+        {latestRequest && (
+          <View style={[styles.latestCard, { backgroundColor: theme.colors.surface, borderColor: statusColor + '44' }]}>
+            <View style={[styles.latestBar, { backgroundColor: statusColor }]} />
+            <View style={styles.latestContent}>
+              <Text style={[styles.latestLabel, { color: theme.colors.onSurfaceVariant }]}>
+                {t('sender.latestStatus')}
+              </Text>
+              <View style={styles.latestRow}>
+                <MaterialCommunityIcons name="phone" size={16} color={theme.colors.onSurfaceVariant} />
+                <Text style={[styles.latestPhone, { color: theme.colors.onSurface }]}>
+                  {formatPhoneDisplay(latestRequest.buyerPhone)}
+                </Text>
+                <Text style={[styles.latestAmount, { color: theme.colors.primary }]}>
+                  {latestRequest.amount} {t('common.currency')}
+                </Text>
+              </View>
+              <View style={[styles.statusPill, { backgroundColor: statusColor + '22' }]}>
+                <MaterialCommunityIcons name={statusIcon as any} size={14} color={statusColor} />
+                <Text style={[styles.statusPillText, { color: statusColor }]}>
+                  {t(`requests.status${latestRequest.status}`)}
+                </Text>
+              </View>
+            </View>
+          </View>
+        )}
       </ScrollView>
 
-      <Snackbar visible={!!snackbar} onDismiss={() => setSnackbar('')} duration={3000}>
+      <Snackbar
+        visible={!!snackbar}
+        onDismiss={() => setSnackbar('')}
+        duration={2000}
+        style={{ borderRadius: 12 }}
+      >
         {snackbar}
       </Snackbar>
     </SafeAreaView>
@@ -307,42 +386,144 @@ export default function SenderScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  scroll: { padding: spacing.lg, paddingBottom: spacing.xxl },
-  header: { alignItems: 'center', marginBottom: spacing.lg, position: 'relative' },
-  historyBtn: { position: 'absolute', right: -spacing.sm, top: -spacing.sm },
-  logo: { fontSize: 52, marginBottom: spacing.xs },
-  greeting: { marginTop: spacing.xs, textAlign: 'center' },
-  dateRow: {
+  root: { flex: 1 },
+
+  // Header
+  header: {
     flexDirection: 'row',
-    gap: spacing.md,
-    marginTop: spacing.sm,
-    marginBottom: spacing.sm,
-  },
-  dateText: { opacity: 0.85 },
-  successBadge: {
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: spacing.lg,
-    gap: spacing.sm,
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
   },
-  input: { marginBottom: spacing.xs },
-  inputContent: { fontSize: typography.senderInput, minHeight: 56 },
-  descriptionContent: { fontSize: typography.body },
-  sectionLabel: { marginTop: spacing.md, marginBottom: spacing.sm, fontWeight: '600' },
-  quickAmounts: {
+  headerTitle: { fontSize: 20, fontWeight: '800', letterSpacing: 0.3 },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  headerLogo: {
+    width: 34,
+    height: 34,
+    borderRadius: 8,
+  },
+  historyBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+  },
+  historyBtnText: { fontSize: 13, fontWeight: '700' },
+
+  // Scroll
+  scroll: { padding: 20, paddingBottom: 48 },
+
+  // Success
+  successBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    padding: 14,
+    borderRadius: 12,
+    marginBottom: 16,
+  },
+  successText: { fontSize: 15, fontWeight: '700' },
+
+  // Fields
+  fieldLabel: { fontSize: 16, fontWeight: '700', marginBottom: 8 },
+  inputBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    minHeight: 56,
+    marginBottom: 4,
+  },
+  descBox: { alignItems: 'flex-start', minHeight: 90 },
+  inputIcon: { marginRight: 10 },
+  input: { flex: 1, fontSize: 17, paddingVertical: 12 },
+  descInput: { paddingTop: 14, textAlignVertical: 'top', minHeight: 70 },
+  clearIcon: { padding: 4 },
+  etbTag: { fontSize: 14, fontWeight: '700', marginLeft: 6 },
+  errorText: { color: '#EF4444', fontSize: 13, marginBottom: 8, marginLeft: 4 },
+  charCount: { fontSize: 12, textAlign: 'right', marginBottom: 8 },
+
+  // Quick amounts
+  quickRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: spacing.sm,
-    marginBottom: spacing.md,
+    gap: 10,
+    marginBottom: 12,
   },
-  amountBtn: { borderRadius: borderRadius.lg, minHeight: 48, minWidth: 80 },
-  amountBtnContent: { paddingHorizontal: spacing.sm, paddingVertical: spacing.sm },
-  amountBtnLabel: { fontSize: 17, fontWeight: '700' },
-  error: { color: colors.accent, marginBottom: spacing.sm, fontSize: typography.caption },
-  charCount: { textAlign: 'right', marginBottom: spacing.md },
-  sendBtn: { borderRadius: borderRadius.lg, marginTop: spacing.md },
-  cancelBtn: { borderRadius: borderRadius.lg, marginTop: spacing.sm },
-  actionBtnContent: { paddingVertical: 16 },
-  actionLabel: { fontSize: typography.senderBody, fontWeight: '700' },
+  amountChip: {
+    borderWidth: 1.5,
+    borderRadius: 12,
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    alignItems: 'center',
+    minWidth: 80,
+  },
+  amountChipText: { fontSize: 18, fontWeight: '800' },
+  amountChipUnit: { fontSize: 11, fontWeight: '600', marginTop: 1 },
+
+  // Buttons
+  sendBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    borderRadius: 14,
+    minHeight: 58,
+    marginTop: 24,
+  },
+  sendBtnText: { color: '#fff', fontSize: 18, fontWeight: '800' },
+  clearBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: 12,
+    paddingVertical: 10,
+  },
+  clearBtnText: { fontSize: 14, fontWeight: '600' },
+
+  // Latest card
+  latestCard: {
+    flexDirection: 'row',
+    marginTop: 28,
+    borderRadius: 14,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  latestBar: { width: 4 },
+  latestContent: { flex: 1, padding: 14, gap: 6 },
+  latestLabel: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
+  latestRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  latestPhone: { fontSize: 15, fontWeight: '700', flex: 1 },
+  latestAmount: { fontSize: 15, fontWeight: '800' },
+  statusPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    alignSelf: 'flex-start',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+  },
+  statusPillText: { fontSize: 12, fontWeight: '700' },
+  langToggleBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: colors.primary + '30',
+  },
+  langToggleText: {
+    fontSize: 13,
+    fontWeight: '800',
+  },
 });

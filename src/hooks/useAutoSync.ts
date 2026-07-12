@@ -9,8 +9,10 @@ import { useAppStore } from '../store/appStore';
 import { isApiConfigured } from '../api/client';
 import i18n from '../i18n';
 import type { Request, Favorite } from '../api/types';
+import { triggerLocalNotification } from '../services/NotificationService';
+import { formatPhoneDisplay } from '../utils/phone';
 
-const SYNC_INTERVAL_MS = 1500;
+const SYNC_INTERVAL_MS = 1000;
 
 export function useAutoSync() {
   const { isConnected } = useNetworkStatus();
@@ -63,7 +65,25 @@ export function useAutoSync() {
         for (const change of reqChanges) {
           const notification = buildRequestNotification(change);
           if (notification) {
-            store.setNotification(notification);
+            const reqDetails = result.requests.find((r) => r.requestId === change.requestId);
+            const formattedPhone = reqDetails ? formatPhoneDisplay(reqDetails.buyerPhone) : '';
+            const amountVal = reqDetails ? reqDetails.amount : '';
+            const title = i18n.t('sync.newRequestNotifTitle');
+            const body = reqDetails
+              ? `${i18n.t('requests.phone')}: ${formattedPhone} | ${i18n.t('requests.amount')}: ${amountVal} ${i18n.t('common.currency')}`
+              : notification.message;
+
+            store.setNotification({
+              id: notification.id,
+              message: body,
+              type: notification.type,
+              title,
+              requestId: change.requestId,
+            });
+
+            if (change.type === 'created') {
+              triggerLocalNotification(title, body);
+            }
             break;
           }
         }
@@ -90,6 +110,36 @@ export function useAutoSync() {
           createdTime: updated.createdTime,
           status: updated.status,
         });
+
+        // Trigger system notification for sender if request status is updated
+        if (store.userMode === 'sender' && initialLoadDone.current) {
+          let title = i18n.t('sender.latestRequest');
+          let body = `${i18n.t('requests.amount')}: ${updated.amount} ${i18n.t('common.currency')}`;
+          let nType: 'info' | 'success' | 'error' = 'info';
+          if (updated.status === 'Completed') {
+            title = i18n.t('sync.requestCompletedTitle');
+            body = `${i18n.t('sync.requestCompleted')} — ${updated.amount} ${i18n.t('common.currency')}`;
+            nType = 'success';
+          } else if (updated.status === 'Processing') {
+            title = i18n.t('sync.requestProcessingTitle');
+            body = `${i18n.t('sync.requestProcessing')} — ${updated.amount} ${i18n.t('common.currency')}`;
+            nType = 'info';
+          } else if (updated.status === 'Cancelled') {
+            title = i18n.t('sync.requestCancelledTitle');
+            body = `${i18n.t('sync.requestCancelled')} — ${updated.amount} ${i18n.t('common.currency')}`;
+            nType = 'error';
+          }
+
+          store.setNotification({
+            id: `status-${updated.requestId}-${updated.status}`,
+            message: body,
+            type: nType,
+            title,
+            requestId: updated.requestId,
+          });
+
+          triggerLocalNotification(title, body);
+        }
       }
     }
 

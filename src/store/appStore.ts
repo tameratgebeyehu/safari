@@ -15,6 +15,8 @@ export interface SyncNotification {
   id: string;
   message: string;
   type: 'info' | 'success' | 'error';
+  title?: string;
+  requestId?: string;
 }
 
 interface AppState {

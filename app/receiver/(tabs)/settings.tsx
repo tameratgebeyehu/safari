@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ScrollView, StyleSheet } from 'react-native';
+import { Image, ScrollView, StyleSheet, View } from 'react-native';
 import {
   Button,
   Dialog,
@@ -14,10 +14,11 @@ import {
 } from 'react-native-paper';
 import { useTranslation } from 'react-i18next';
 import { router } from 'expo-router';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { APP_VERSION, DEVELOPER_NAME } from '../../../src/constants';
 import { useAppStore } from '../../../src/store/appStore';
 import { changePin, isValidPinFormat } from '../../../src/services/PinService';
-import { spacing } from '../../../src/theme/colors';
+import { spacing, colors, borderRadius } from '../../../src/theme/colors';
 
 export default function SettingsScreen() {
   const theme = useTheme();
@@ -159,9 +160,20 @@ export default function SettingsScreen() {
       {/* ── Dialogs ── */}
       <Portal>
         {/* Change PIN */}
-        <Dialog visible={pinDialogVisible} onDismiss={() => setPinDialogVisible(false)}>
-          <Dialog.Title>{t('pin.changePin')}</Dialog.Title>
-          <Dialog.Content>
+        <Dialog
+          visible={pinDialogVisible}
+          onDismiss={() => setPinDialogVisible(false)}
+          style={[styles.dialog, { backgroundColor: theme.colors.elevation.level3 }]}
+        >
+          <Dialog.Title>
+            <View style={styles.dialogTitleContainer}>
+              <MaterialCommunityIcons name="lock-reset" size={24} color={colors.primary} />
+              <Text style={[styles.dialogTitle, { color: theme.colors.onSurface }]}>
+                {t('pin.changePin')}
+              </Text>
+            </View>
+          </Dialog.Title>
+          <Dialog.Content style={styles.dialogContent}>
             <TextInput
               label={t('pin.currentPin')}
               value={currentPin}
@@ -170,6 +182,7 @@ export default function SettingsScreen() {
               secureTextEntry
               mode="outlined"
               style={styles.input}
+              activeOutlineColor={colors.primary}
             />
             <TextInput
               label={t('pin.newPin')}
@@ -179,6 +192,7 @@ export default function SettingsScreen() {
               secureTextEntry
               mode="outlined"
               style={styles.input}
+              activeOutlineColor={colors.primary}
             />
             <TextInput
               label={t('pin.confirmPin')}
@@ -188,58 +202,133 @@ export default function SettingsScreen() {
               secureTextEntry
               mode="outlined"
               style={styles.input}
+              activeOutlineColor={colors.primary}
             />
           </Dialog.Content>
           <Dialog.Actions>
-            <Button onPress={() => setPinDialogVisible(false)}>{t('common.cancel')}</Button>
-            <Button mode="contained" onPress={handleChangePin}>
+            <Button onPress={() => setPinDialogVisible(false)} labelStyle={{ color: theme.colors.onSurfaceVariant }}>
+              {t('common.cancel')}
+            </Button>
+            <Button mode="contained" onPress={handleChangePin} buttonColor={colors.primary} style={{ borderRadius: 12 }}>
               {t('common.save')}
             </Button>
           </Dialog.Actions>
         </Dialog>
 
         {/* Switch Mode Confirmation */}
-        <Dialog visible={switchModeDialogVisible} onDismiss={() => setSwitchModeDialogVisible(false)}>
-          <Dialog.Title>{t('settings.switchMode')}</Dialog.Title>
-          <Dialog.Content>
-            <Text variant="bodyMedium">{t('settings.switchModeConfirm')}</Text>
+        <Dialog
+          visible={switchModeDialogVisible}
+          onDismiss={() => setSwitchModeDialogVisible(false)}
+          style={[styles.dialog, { backgroundColor: theme.colors.elevation.level3 }]}
+        >
+          <Dialog.Title>
+            <View style={styles.dialogTitleContainer}>
+              <MaterialCommunityIcons name="swap-horizontal-bold" size={24} color={colors.primary} />
+              <Text style={[styles.dialogTitle, { color: theme.colors.onSurface }]}>
+                {t('settings.switchMode')}
+              </Text>
+            </View>
+          </Dialog.Title>
+          <Dialog.Content style={styles.dialogContent}>
+            <Text variant="bodyMedium" style={{ lineHeight: 20, color: theme.colors.onSurfaceVariant }}>
+              {t('settings.switchModeConfirm')}
+            </Text>
           </Dialog.Content>
           <Dialog.Actions>
-            <Button onPress={() => setSwitchModeDialogVisible(false)}>{t('common.cancel')}</Button>
-            <Button mode="contained" onPress={handleSwitchMode}>
+            <Button onPress={() => setSwitchModeDialogVisible(false)} labelStyle={{ color: theme.colors.onSurfaceVariant }}>
+              {t('common.cancel')}
+            </Button>
+            <Button mode="contained" onPress={handleSwitchMode} buttonColor={colors.primary} style={{ borderRadius: 12 }}>
               {t('common.confirm')}
             </Button>
           </Dialog.Actions>
         </Dialog>
 
         {/* About */}
-        <Dialog visible={aboutDialogVisible} onDismiss={() => setAboutDialogVisible(false)}>
-          <Dialog.Title>{t('settings.about')}</Dialog.Title>
-          <Dialog.Content>
-            <Text variant="bodyLarge" style={{ fontWeight: '700' }}>🦁 {t('common.appName')}</Text>
-            <Text variant="bodyMedium" style={styles.aboutRow}>
-              {t('settings.version')}: {APP_VERSION}
-            </Text>
-            <Text variant="bodyMedium" style={styles.aboutRow}>
-              {t('settings.developer')}: {DEVELOPER_NAME}
-            </Text>
+        <Dialog
+          visible={aboutDialogVisible}
+          onDismiss={() => setAboutDialogVisible(false)}
+          style={[styles.dialog, { backgroundColor: theme.colors.elevation.level3 }]}
+        >
+          <Dialog.Title>
+            <View style={styles.dialogTitleContainer}>
+              <MaterialCommunityIcons name="information-outline" size={24} color={colors.primary} />
+              <Text style={[styles.dialogTitle, { color: theme.colors.onSurface }]}>
+                {t('settings.about')}
+              </Text>
+            </View>
+          </Dialog.Title>
+          <Dialog.Content style={styles.dialogContent}>
+            {/* App Card */}
+            <View style={[styles.aboutCard, { backgroundColor: theme.colors.surfaceVariant + '40', borderColor: theme.colors.outlineVariant }]}>
+              <Image source={require('../../../assets/logo.png')} style={styles.aboutLogo} resizeMode="contain" />
+              <View style={styles.aboutInfo}>
+                <Text style={[styles.aboutAppName, { color: theme.colors.onSurface }]}>
+                  {t('common.appName')}
+                </Text>
+                <View style={[styles.aboutVersionBadge, { backgroundColor: colors.primary + '18' }]}>
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: colors.primary }}>
+                    {t('settings.version')} {APP_VERSION}
+                  </Text>
+                </View>
+              </View>
+            </View>
+
+            {/* Info Grid */}
+            <View style={[styles.aboutDetailRow, { borderBottomColor: theme.colors.outlineVariant }]}>
+              <MaterialCommunityIcons name="account-cog-outline" size={18} color={theme.colors.onSurfaceVariant} />
+              <Text style={[styles.aboutDetailText, { color: theme.colors.onSurfaceVariant, flex: 1 }]}>
+                {t('settings.developer')}
+              </Text>
+              <Text style={[styles.aboutDetailText, { color: theme.colors.onSurface, fontWeight: '700' }]}>
+                {DEVELOPER_NAME}
+              </Text>
+            </View>
+            <View style={[styles.aboutDetailRow, { borderBottomColor: 'transparent' }]}>
+              <MaterialCommunityIcons name="check-decagram-outline" size={18} color={colors.completed} />
+              <Text style={[styles.aboutDetailText, { color: theme.colors.onSurfaceVariant, flex: 1 }]}>
+                Status
+              </Text>
+              <Text style={[styles.aboutDetailText, { color: colors.completed, fontWeight: '700' }]}>
+                Production Ready
+              </Text>
+            </View>
           </Dialog.Content>
           <Dialog.Actions>
-            <Button onPress={() => setAboutDialogVisible(false)}>{t('common.back')}</Button>
+            <Button onPress={() => setAboutDialogVisible(false)} labelStyle={{ color: colors.primary, fontWeight: '700' }}>
+              {t('common.back')}
+            </Button>
           </Dialog.Actions>
         </Dialog>
 
         {/* Privacy */}
-        <Dialog visible={privacyDialogVisible} onDismiss={() => setPrivacyDialogVisible(false)}>
-          <Dialog.Title>{t('settings.privacy')}</Dialog.Title>
-          <Dialog.Content>
-            <Text variant="bodyMedium">{t('settings.privacyText')}</Text>
-            <Text variant="bodyMedium" style={styles.aboutRow}>
-              {t('settings.licenseText')}
+        <Dialog
+          visible={privacyDialogVisible}
+          onDismiss={() => setPrivacyDialogVisible(false)}
+          style={[styles.dialog, { backgroundColor: theme.colors.elevation.level3 }]}
+        >
+          <Dialog.Title>
+            <View style={styles.dialogTitleContainer}>
+              <MaterialCommunityIcons name="shield-check-outline" size={24} color={colors.primary} />
+              <Text style={[styles.dialogTitle, { color: theme.colors.onSurface }]}>
+                {t('settings.privacy')}
+              </Text>
+            </View>
+          </Dialog.Title>
+          <Dialog.Content style={styles.dialogContent}>
+            <Text style={[styles.privacyText, { color: theme.colors.onSurfaceVariant }]}>
+              {t('settings.privacyText')}
             </Text>
+            <View style={[styles.licenseBox, { backgroundColor: colors.primary + '08', borderColor: colors.primary + '30' }]}>
+              <Text style={[styles.licenseText, { color: colors.primary }]}>
+                {t('settings.licenseText')}
+              </Text>
+            </View>
           </Dialog.Content>
           <Dialog.Actions>
-            <Button onPress={() => setPrivacyDialogVisible(false)}>{t('common.back')}</Button>
+            <Button onPress={() => setPrivacyDialogVisible(false)} labelStyle={{ color: colors.primary, fontWeight: '700' }}>
+              {t('common.back')}
+            </Button>
           </Dialog.Actions>
         </Dialog>
       </Portal>
@@ -253,6 +342,81 @@ export default function SettingsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  input: { marginBottom: spacing.sm },
-  aboutRow: { marginTop: spacing.sm },
+  dialog: {
+    borderRadius: 24,
+    paddingVertical: spacing.xs,
+  },
+  dialogTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: spacing.xs,
+  },
+  dialogTitle: {
+    fontWeight: '800',
+    fontSize: 20,
+    letterSpacing: 0.3,
+  },
+  dialogContent: {
+    paddingTop: spacing.xs,
+    paddingBottom: spacing.sm,
+  },
+  input: {
+    marginBottom: spacing.sm,
+  },
+  aboutCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+    padding: spacing.md,
+    borderRadius: 16,
+    marginBottom: spacing.md,
+    borderWidth: 1,
+  },
+  aboutLogo: {
+    width: 60,
+    height: 60,
+    borderRadius: 14,
+  },
+  aboutInfo: {
+    flex: 1,
+    gap: 4,
+  },
+  aboutAppName: {
+    fontWeight: '800',
+    fontSize: 18,
+  },
+  aboutVersionBadge: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 8,
+  },
+  aboutDetailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+  },
+  aboutDetailText: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  privacyText: {
+    fontSize: 14,
+    lineHeight: 22,
+    marginBottom: spacing.md,
+  },
+  licenseBox: {
+    padding: spacing.md,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+  },
+  licenseText: {
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: '600',
+  },
 });

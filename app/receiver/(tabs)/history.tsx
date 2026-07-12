@@ -1,8 +1,8 @@
-import React, { useMemo, useState } from 'react';
-import { RefreshControl, SectionList, StyleSheet, View } from 'react-native';
-import { Chip, Searchbar, Text, useTheme } from 'react-native-paper';
+import React, { useLayoutEffect, useMemo, useState } from 'react';
+import { RefreshControl, SectionList, StyleSheet, View, Pressable, TextInput as RNTextInput } from 'react-native';
+import { Chip, Text, useTheme } from 'react-native-paper';
 import { useTranslation } from 'react-i18next';
-import { useRouter } from 'expo-router';
+import { useRouter, useNavigation } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { EmptyState } from '../../../src/components/EmptyState';
 import { RequestCard } from '../../../src/components/RequestCard';
@@ -16,7 +16,7 @@ import {
   searchRequests,
   sortRequests,
 } from '../../../src/utils/requestHelpers';
-import { spacing, colors } from '../../../src/theme/colors';
+import { spacing, colors, borderRadius } from '../../../src/theme/colors';
 
 const STATUS_FILTERS: Array<{ key: RequestStatus | 'all'; color?: string }> = [
   { key: 'all' },
@@ -27,21 +27,54 @@ const STATUS_FILTERS: Array<{ key: RequestStatus | 'all'; color?: string }> = [
 ];
 
 const SORT_OPTIONS = [
-  { key: 'newest' as const, icon: 'sort-calendar-descending' },
-  { key: 'oldest' as const, icon: 'sort-calendar-ascending' },
-  { key: 'highestAmount' as const, icon: 'sort-numeric-descending' },
-  { key: 'lowestAmount' as const, icon: 'sort-numeric-ascending' },
+  { key: 'newest' as const, labelKey: 'history.newest' },
+  { key: 'oldest' as const, labelKey: 'history.oldest' },
+  { key: 'highestAmount' as const, labelKey: 'history.highestAmount' },
+  { key: 'lowestAmount' as const, labelKey: 'history.lowestAmount' },
 ];
 
 export default function HistoryScreen() {
   const theme = useTheme();
   const { t } = useTranslation();
   const router = useRouter();
+  const navigation = useNavigation();
   const { data: requests, isLoading, refetch, isRefetching } = useRequests();
 
+  const [searchVisible, setSearchVisible] = useState(false);
+  const [filterVisible, setFilterVisible] = useState(false);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<RequestStatus | 'all'>('all');
   const [sortBy, setSortBy] = useState<typeof SORT_OPTIONS[number]['key']>('newest');
+
+  // Header: Search icon + Filter icon
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerRight: () => (
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginRight: 8, gap: 4 }}>
+          <Pressable
+            onPress={() => { setFilterVisible((v) => !v); }}
+            style={{ padding: 6 }}
+          >
+            <MaterialCommunityIcons
+              name={filterVisible ? 'filter-off' : 'filter-variant'}
+              size={22}
+              color={filterVisible ? colors.primary : theme.colors.onSurface}
+            />
+          </Pressable>
+          <Pressable
+            onPress={() => { setSearchVisible((v) => !v); setSearch(''); }}
+            style={{ padding: 6 }}
+          >
+            <MaterialCommunityIcons
+              name={searchVisible ? 'close' : 'magnify'}
+              size={22}
+              color={searchVisible ? colors.primary : theme.colors.onSurface}
+            />
+          </Pressable>
+        </View>
+      ),
+    });
+  }, [navigation, searchVisible, filterVisible, theme.colors.onSurface]);
 
   const { sections, totalCount } = useMemo(() => {
     let items: Request[] = requests ?? [];
@@ -56,7 +89,6 @@ export default function HistoryScreen() {
       .filter((key) => grouped[key].length > 0)
       .map((key) => ({
         title: t(`history.${key}`),
-        icon: key === 'today' ? 'calendar-today' : 'calendar-blank',
         data: grouped[key] as Request[],
       }));
 
@@ -68,12 +100,6 @@ export default function HistoryScreen() {
   if (isLoading && !requests) {
     return (
       <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
-        <Searchbar
-          placeholder={t('common.search')}
-          onChangeText={setSearch}
-          value={search}
-          style={[styles.search, { backgroundColor: theme.colors.surface }]}
-        />
         <View style={styles.listPadding}>
           <SkeletonList count={6} />
         </View>
@@ -83,66 +109,97 @@ export default function HistoryScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      {/* Search */}
-      <Searchbar
-        placeholder={t('common.search')}
-        onChangeText={setSearch}
-        value={search}
-        style={[styles.search, { backgroundColor: theme.colors.surface }]}
-      />
+      {/* Search bar — only shown when toggled */}
+      {searchVisible && (
+        <View style={[styles.searchContainer, { backgroundColor: theme.colors.surface, borderBottomColor: theme.colors.outline + '30' }]}>
+          <MaterialCommunityIcons name="magnify" size={18} color={theme.colors.onSurfaceVariant} />
+          <RNTextInput
+            placeholder={t('common.search')}
+            placeholderTextColor={theme.colors.onSurfaceVariant}
+            value={search}
+            onChangeText={setSearch}
+            autoFocus
+            style={[styles.searchInput, { color: theme.colors.onSurface }]}
+          />
+          {search.length > 0 && (
+            <Pressable onPress={() => setSearch('')}>
+              <MaterialCommunityIcons name="close-circle" size={16} color={theme.colors.onSurfaceVariant} />
+            </Pressable>
+          )}
+        </View>
+      )}
 
-      {/* Status Filter Chips */}
-      <View style={styles.chipsRow}>
-        {STATUS_FILTERS.map(({ key, color }) => (
-          <Chip
-            key={key}
-            selected={statusFilter === key}
-            onPress={() => setStatusFilter(key)}
-            style={[
-              styles.chip,
-              statusFilter === key && { backgroundColor: (color ?? colors.primary) + '20' },
-            ]}
-            textStyle={
-              statusFilter === key
-                ? { color: color ?? colors.primary, fontWeight: '700' }
-                : { color: theme.colors.onSurfaceVariant }
-            }
-            compact
-          >
-            {key === 'all' ? t('history.allStatuses') : t(`requests.status${key}`)}
-          </Chip>
-        ))}
-      </View>
+      {/* Filter panel — only shown when toggled */}
+      {filterVisible && (
+        <View style={[styles.filterPanel, { backgroundColor: theme.colors.surface, borderBottomColor: theme.colors.outline + '25' }]}>
+          {/* Status filters */}
+          <Text variant="labelSmall" style={[styles.filterSectionLabel, { color: theme.colors.onSurfaceVariant }]}>
+            {t('history.filterStatus')}
+          </Text>
+          <View style={styles.chipsRow}>
+            {STATUS_FILTERS.map(({ key, color }) => (
+              <Chip
+                key={key}
+                selected={statusFilter === key}
+                onPress={() => setStatusFilter(key)}
+                style={[
+                  styles.chip,
+                  { backgroundColor: statusFilter === key ? (color ?? colors.primary) + '18' : theme.colors.surfaceVariant },
+                ]}
+                textStyle={
+                  statusFilter === key
+                    ? { color: color ?? colors.primary, fontWeight: '700', fontSize: 12 }
+                    : { color: theme.colors.onSurfaceVariant, fontSize: 12 }
+                }
+                compact
+              >
+                {key === 'all' ? t('history.allStatuses') : t(`requests.status${key}`)}
+              </Chip>
+            ))}
+          </View>
 
-      {/* Sort Options */}
-      <View style={styles.chipsRow}>
-        {SORT_OPTIONS.map(({ key, icon }) => (
-          <Chip
-            key={key}
-            selected={sortBy === key}
-            onPress={() => setSortBy(key)}
-            style={[
-              styles.chip,
-              sortBy === key && { backgroundColor: colors.processing + '20' },
-            ]}
-            textStyle={
-              sortBy === key
-                ? { color: colors.processing, fontWeight: '700' }
-                : { color: theme.colors.onSurfaceVariant }
-            }
-            icon={icon as any}
-            compact
-          >
-            {t(`history.${key}`)}
-          </Chip>
-        ))}
-      </View>
+          {/* Sort options */}
+          <Text variant="labelSmall" style={[styles.filterSectionLabel, { color: theme.colors.onSurfaceVariant, marginTop: spacing.sm }]}>
+            {t('history.sortBy')}
+          </Text>
+          <View style={styles.chipsRow}>
+            {SORT_OPTIONS.map(({ key, labelKey }) => (
+              <Chip
+                key={key}
+                selected={sortBy === key}
+                onPress={() => setSortBy(key)}
+                style={[
+                  styles.chip,
+                  { backgroundColor: sortBy === key ? colors.processing + '18' : theme.colors.surfaceVariant },
+                ]}
+                textStyle={
+                  sortBy === key
+                    ? { color: colors.processing, fontWeight: '700', fontSize: 12 }
+                    : { color: theme.colors.onSurfaceVariant, fontSize: 12 }
+                }
+                compact
+              >
+                {t(labelKey)}
+              </Chip>
+            ))}
+          </View>
+        </View>
+      )}
 
-      {/* Result count */}
+      {/* Active filters summary bar */}
       {(search || statusFilter !== 'all') && (
-        <Text variant="labelSmall" style={[styles.resultCount, { color: theme.colors.onSurfaceVariant }]}>
-          {totalCount} {t('history.results')}
-        </Text>
+        <View style={styles.resultRow}>
+          <Text variant="labelSmall" style={{ color: theme.colors.onSurfaceVariant }}>
+            {totalCount} {t('history.results')}
+          </Text>
+          {statusFilter !== 'all' && (
+            <Pressable onPress={() => setStatusFilter('all')}>
+              <Text variant="labelSmall" style={{ color: colors.primary, fontWeight: '600' }}>
+                {t('common.clear')}
+              </Text>
+            </Pressable>
+          )}
+        </View>
       )}
 
       <SectionList
@@ -153,10 +210,9 @@ export default function HistoryScreen() {
         refreshControl={
           <RefreshControl refreshing={isRefetching} onRefresh={handleRefresh} colors={[colors.primary]} />
         }
-        renderSectionHeader={({ section: { title, icon } }) => (
+        renderSectionHeader={({ section: { title } }) => (
           <View style={[styles.sectionHeaderRow, { backgroundColor: theme.colors.background }]}>
-            <MaterialCommunityIcons name={icon as any} size={14} color={theme.colors.onSurfaceVariant} />
-            <Text variant="titleSmall" style={[styles.sectionHeader, { color: theme.colors.onSurface }]}>
+            <Text variant="labelMedium" style={[styles.sectionHeader, { color: theme.colors.onSurfaceVariant }]}>
               {title}
             </Text>
           </View>
@@ -174,31 +230,53 @@ export default function HistoryScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  search: { margin: spacing.md, marginBottom: spacing.xs },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderBottomWidth: 1,
+    gap: spacing.sm,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 15,
+    paddingVertical: 0,
+  },
+  filterPanel: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderBottomWidth: 1,
+  },
+  filterSectionLabel: {
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: spacing.xs,
+  },
   chipsRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: spacing.xs,
-    paddingHorizontal: spacing.md,
-    marginBottom: spacing.xs,
   },
   chip: { borderRadius: 20 },
-  resultCount: {
-    paddingHorizontal: spacing.md,
-    marginBottom: spacing.xs,
-    opacity: 0.7,
-  },
-  listPadding: { padding: spacing.md, flexGrow: 1, paddingBottom: spacing.xxl },
-  sectionHeaderRow: {
+  resultRow: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    gap: 6,
-    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+  },
+  listPadding: { padding: spacing.md, flexGrow: 1, paddingBottom: 90 },
+  sectionHeaderRow: {
+    paddingVertical: spacing.xs,
     paddingHorizontal: spacing.xs,
+    marginBottom: 4,
   },
   sectionHeader: {
     fontWeight: '700',
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    letterSpacing: 0.6,
+    fontSize: 11,
   },
 });

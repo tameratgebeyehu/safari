@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { ScrollView, StyleSheet, View, TouchableOpacity } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import {
   Button,
-  Card,
   Chip,
   Dialog,
   Divider,
@@ -13,6 +12,7 @@ import {
   Text,
   TextInput,
   useTheme,
+  Surface,
 } from 'react-native-paper';
 import * as Clipboard from 'expo-clipboard';
 import { useTranslation } from 'react-i18next';
@@ -26,6 +26,77 @@ import { generateFavoriteId } from '../../../src/utils/requestId';
 import { getEthiopianDateTime } from '../../../src/utils/ethiopianDate';
 import { spacing, borderRadius, colors } from '../../../src/theme/colors';
 import type { RequestStatus } from '../../../src/constants';
+
+// ─── Status helpers ────────────────────────────────────────────────────────────
+
+const STATUS_ICONS: Record<string, string> = {
+  Pending: 'clock-outline',
+  Processing: 'progress-clock',
+  Completed: 'check-circle',
+  Cancelled: 'close-circle',
+};
+
+const STATUS_LABELS: Record<string, string> = {
+  Pending: 'Pending',
+  Processing: 'Processing',
+  Completed: 'Completed',
+  Cancelled: 'Cancelled',
+};
+
+// ─── Sub-components ────────────────────────────────────────────────────────────
+
+interface InfoRowProps {
+  label: string;
+  value: string;
+  mono?: boolean;
+  valueColor?: string;
+  icon?: string;
+}
+
+function InfoRow({ label, value, mono, valueColor, icon }: InfoRowProps) {
+  const theme = useTheme();
+  return (
+    <View style={rowStyles.container}>
+      <Text style={[rowStyles.label, { color: theme.colors.onSurfaceVariant }]}>{label}</Text>
+      <View style={rowStyles.valueRow}>
+        {icon && (
+          <MaterialCommunityIcons
+            name={icon as any}
+            size={14}
+            color={valueColor || theme.colors.onSurface}
+            style={{ marginRight: 4 }}
+          />
+        )}
+        <Text
+          style={[
+            rowStyles.value,
+            mono && rowStyles.mono,
+            { color: valueColor || theme.colors.onSurface },
+          ]}
+          numberOfLines={mono ? 1 : undefined}
+        >
+          {value}
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+const rowStyles = StyleSheet.create({
+  container: { marginBottom: 12 },
+  label: {
+    fontSize: 11,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+    marginBottom: 3,
+  },
+  valueRow: { flexDirection: 'row', alignItems: 'center' },
+  value: { fontSize: 14, fontWeight: '500', flex: 1 },
+  mono: { fontFamily: 'monospace', fontSize: 12, opacity: 0.7 },
+});
+
+// ─── Main Screen ───────────────────────────────────────────────────────────────
 
 export default function RequestDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -48,69 +119,85 @@ export default function RequestDetailScreen() {
   if (!request) {
     return (
       <View style={[styles.center, { backgroundColor: theme.colors.background }]}>
-        <Text variant="bodyLarge" style={{ color: theme.colors.onSurfaceVariant }}>
-          {t('common.noData')}
+        <MaterialCommunityIcons name="file-search-outline" size={48} color={theme.colors.onSurfaceVariant} />
+        <Text variant="bodyLarge" style={{ color: theme.colors.onSurfaceVariant, marginTop: 8 }}>
+          Request not found
         </Text>
-        <Button mode="text" onPress={() => router.back()}>
-          {t('common.back')}
+        <Button mode="text" onPress={() => router.back()} style={{ marginTop: 8 }}>
+          Go Back
         </Button>
       </View>
     );
   }
 
   const isFavorited = (favorites ?? []).some((fav) => fav.phoneNumber === request.buyerPhone);
-
   const statusColor = getStatusColor(request.status);
-  const statusKey = `requests.status${request.status}` as const;
+  const statusIcon = STATUS_ICONS[request.status] || 'help-circle-outline';
 
-  const copyToClipboard = async (text: string) => {
+  // ── Handlers ──────────────────────────────────────────────────────────────
+
+  const copyToClipboard = async (text: string, label = 'Copied') => {
     await Clipboard.setStringAsync(text);
-    setSnackbar(t('common.copied'));
+    setSnackbar(`${label} copied`);
   };
 
   const updateStatus = async (status: RequestStatus) => {
     const ethDateTime = getEthiopianDateTime();
-    await updateRequest.mutateAsync({
-      requestId: request.requestId,
-      status,
-      completedDate: status === 'Completed' ? ethDateTime.ethiopianDate : undefined,
-      completedTime: status === 'Completed' ? ethDateTime.ethiopianTime : undefined,
-      userMode: 'receiver',
-    });
-    setSnackbar(t('common.save'));
+    try {
+      await updateRequest.mutateAsync({
+        requestId: request.requestId,
+        status,
+        completedDate: status === 'Completed' ? ethDateTime.ethiopianDate : undefined,
+        completedTime: status === 'Completed' ? ethDateTime.ethiopianTime : undefined,
+        userMode: 'receiver',
+      });
+      setSnackbar(`Marked as ${status}`);
+    } catch (err: any) {
+      setSnackbar(err.message || `Failed to update to ${status}`);
+    }
   };
 
   const handleEditDescription = async () => {
-    await updateRequest.mutateAsync({
-      requestId: request.requestId,
-      description: editDescription.trim(),
-      userMode: 'receiver',
-    });
-    setEditDialogVisible(false);
-    setSnackbar(t('common.save'));
+    try {
+      await updateRequest.mutateAsync({
+        requestId: request.requestId,
+        description: editDescription.trim(),
+        userMode: 'receiver',
+      });
+      setSnackbar('Note updated');
+    } catch (err: any) {
+      setSnackbar(err.message || 'Failed to update note');
+    } finally {
+      setEditDialogVisible(false);
+    }
   };
 
   const handleAddToFavorites = async () => {
-    if (isFavorited) {
-      setSnackbar(t('common.save'));
-      return;
-    }
+    if (isFavorited) return;
     const now = new Date();
-    await createFavorite.mutateAsync({
-      favoriteId: generateFavoriteId(),
-      phoneNumber: request.buyerPhone,
-      customerName: request.buyerPhone,
-      description: request.description,
-      createdDate: now.toISOString().split('T')[0],
-      userMode: 'receiver',
-    });
-    setSnackbar(t('common.save'));
+    try {
+      await createFavorite.mutateAsync({
+        favoriteId: generateFavoriteId(),
+        phoneNumber: request.buyerPhone,
+        customerName: request.buyerPhone,
+        description: request.description,
+        createdDate: now.toISOString().split('T')[0],
+        userMode: 'receiver',
+      });
+      setSnackbar('Added to favourites');
+    } catch (err: any) {
+      setSnackbar(err.message || 'Failed to add to favorites');
+    }
   };
 
   const handleDelete = async () => {
     setDeleteDialogVisible(false);
-    await deleteRequest.mutateAsync(request.requestId);
-    router.back();
+    try {
+      await deleteRequest.mutateAsync(request.requestId);
+      router.back();
+    } catch (err: any) {
+      setSnackbar(err.message || 'Failed to delete request');
+    }
   };
 
   const handleCancelRequest = async () => {
@@ -118,364 +205,457 @@ export default function RequestDetailScreen() {
     await updateStatus('Cancelled');
   };
 
-  const getStatusEmoji = (status: string) => {
-    switch (status) {
-      case 'Pending': return '🟡';
-      case 'Processing': return '🔵';
-      case 'Completed': return '🟢';
-      case 'Cancelled': return '🔴';
-      default: return '';
-    }
-  };
+  // ── Derived display values ────────────────────────────────────────────────
+
+  const amountFormatted = Number(request.amount).toLocaleString('en-ET');
+  const phoneFormatted = formatPhoneDisplay(request.buyerPhone);
+  const createdDisplay = `${request.createdDate}  ·  ${request.createdTime}`;
+  const completedDisplay = request.completedDate
+    ? `${request.completedDate}  ·  ${request.completedTime}`
+    : '';
+
+  const isCompleted = request.status === 'Completed';
+  const isCancelled = request.status === 'Cancelled';
+  const isProcessing = request.status === 'Processing';
+
+  // ── Render ────────────────────────────────────────────────────────────────
 
   return (
     <ScrollView
       style={[styles.container, { backgroundColor: theme.colors.background }]}
       contentContainerStyle={styles.content}
+      showsVerticalScrollIndicator={false}
     >
-      {/* Customer Info Card */}
-      <Card style={styles.card} mode="elevated">
-        <Card.Content>
-          <View style={styles.customerHeaderRow}>
-            <View>
-              <Text variant="labelLarge" style={{ color: theme.colors.primary, fontWeight: '700' }}>
-                {t('requests.customerInfo')}
-              </Text>
-              <Text variant="headlineSmall" style={styles.phoneDisplay}>
-                🇪🇹 {formatPhoneDisplay(request.buyerPhone)}
+      {/* ── CUSTOMER CARD ── */}
+      <Surface style={[styles.card, { backgroundColor: theme.colors.surface }]} elevation={1}>
+        {/* Phone + actions row */}
+        <View style={styles.customerTop}>
+          <View style={styles.customerLeft}>
+            <View style={styles.flagRow}>
+              <Text style={styles.flag}>🇪🇹</Text>
+              <Text style={[styles.phoneNumber, { color: theme.colors.onSurface }]}>
+                {phoneFormatted}
               </Text>
             </View>
-            <View style={styles.customerHeaderActions}>
-              <IconButton
-                icon="content-copy"
-                size={22}
-                onPress={() => copyToClipboard(request.buyerPhone)}
-                style={{ backgroundColor: theme.colors.surfaceVariant }}
+            <View style={styles.badgeRow}>
+              <View style={[styles.statusBadge, { backgroundColor: statusColor + '22' }]}>
+                <MaterialCommunityIcons name={statusIcon as any} size={13} color={statusColor} />
+                <Text style={[styles.statusBadgeText, { color: statusColor }]}>
+                  {STATUS_LABELS[request.status]}
+                </Text>
+              </View>
+            </View>
+          </View>
+
+          {/* Icon actions — the only place copy + favourite appear */}
+          <View style={styles.customerActions}>
+            <TouchableOpacity
+              style={[styles.iconAction, { backgroundColor: theme.colors.surfaceVariant }]}
+              onPress={() => copyToClipboard(request.buyerPhone, 'Phone number')}
+            >
+              <MaterialCommunityIcons name="content-copy" size={18} color={theme.colors.onSurfaceVariant} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.iconAction,
+                {
+                  backgroundColor: isFavorited
+                    ? '#F59E0B22'
+                    : theme.colors.surfaceVariant,
+                },
+              ]}
+              onPress={handleAddToFavorites}
+              disabled={isFavorited}
+            >
+              <MaterialCommunityIcons
+                name={isFavorited ? 'star' : 'star-outline'}
+                size={18}
+                color={isFavorited ? '#F59E0B' : theme.colors.onSurfaceVariant}
               />
-              <IconButton
-                icon={isFavorited ? "star" : "star-outline"}
-                iconColor={isFavorited ? '#F59E0B' : undefined}
-                size={22}
-                onPress={handleAddToFavorites}
-                style={{ backgroundColor: theme.colors.surfaceVariant }}
-                disabled={isFavorited}
-              />
-            </View>
+            </TouchableOpacity>
           </View>
-        </Card.Content>
-      </Card>
+        </View>
 
-      {/* Request Info Card */}
-      <Card style={styles.card} mode="elevated">
-        <Card.Content style={styles.requestInfoContent}>
-          <Text variant="labelLarge" style={[styles.cardTitle, { color: theme.colors.primary }]}>
-            {t('requests.requestInfo')}
+        <Divider style={{ marginVertical: 12 }} />
+
+        {/* Request ID */}
+        <View style={styles.idRow}>
+          <MaterialCommunityIcons name="identifier" size={13} color={theme.colors.onSurfaceVariant} />
+          <Text style={[styles.idText, { color: theme.colors.onSurfaceVariant }]}>
+            {request.requestId}
           </Text>
-          <Divider style={styles.divider} />
-          
-          <View style={styles.infoGridRow}>
-            <View style={styles.infoCell}>
-              <Text variant="labelSmall" style={styles.cellLabel}>{t('requests.amount')}</Text>
-              <Text variant="headlineMedium" style={[styles.cellValue, { color: theme.colors.primary }]}>
-                {request.amount} ETB
-              </Text>
-            </View>
-            <View style={styles.infoCell}>
-              <Text variant="labelSmall" style={styles.cellLabel}>{t('requests.status')}</Text>
-              <Chip
-                compact
-                style={[styles.statusChip, { backgroundColor: statusColor + '22' }]}
-                textStyle={{ color: statusColor, fontWeight: '700', fontSize: 13 }}
-              >
-                {`${getStatusEmoji(request.status)} ${t(statusKey)}`}
-              </Chip>
-            </View>
-          </View>
+          <TouchableOpacity onPress={() => copyToClipboard(request.requestId, 'Request ID')}>
+            <MaterialCommunityIcons name="content-copy" size={13} color={theme.colors.onSurfaceVariant} />
+          </TouchableOpacity>
+        </View>
+      </Surface>
 
-          <View style={styles.detailRow}>
-            <Text variant="labelSmall" style={styles.detailLabel}>{t('requests.description')}</Text>
-            <Text variant="bodyMedium" style={styles.detailValue}>
-              {request.description || t('common.noData')}
+      {/* ── DETAILS CARD ── */}
+      <Surface style={[styles.card, { backgroundColor: theme.colors.surface }]} elevation={1}>
+
+        {/* Amount hero */}
+        <View style={styles.amountRow}>
+          <View style={styles.amountLeft}>
+            <Text style={[styles.amountLabel, { color: theme.colors.onSurfaceVariant }]}>
+              AMOUNT
+            </Text>
+            <Text style={[styles.amountValue, { color: theme.colors.primary }]}>
+              {amountFormatted}
+              <Text style={[styles.amountUnit, { color: theme.colors.onSurfaceVariant }]}> {t('common.currency')}</Text>
             </Text>
           </View>
-
-          <View style={styles.detailRow}>
-            <Text variant="labelSmall" style={styles.detailLabel}>{t('requests.date')}</Text>
-            <Text variant="bodyMedium" style={styles.detailValue}>
-              📅 {request.createdDate} · 🕐 {request.createdTime}
-            </Text>
-          </View>
-
-          {request.status === 'Completed' && request.completedDate && (
-            <View style={styles.detailRow}>
-              <Text variant="labelSmall" style={styles.detailLabel}>{t('requests.completedDate')}</Text>
-              <Text variant="bodyMedium" style={[styles.detailValue, { color: colors.completed, fontWeight: '600' }]}>
-                📅 {request.completedDate} · 🕐 {request.completedTime}
-              </Text>
-            </View>
-          )}
-
-          <View style={styles.detailRow}>
-            <Text variant="labelSmall" style={styles.detailLabel}>{t('requests.requestId')}</Text>
-            <Text variant="bodySmall" style={styles.detailValueId}>
-              {request.requestId}
-            </Text>
-          </View>
-        </Card.Content>
-      </Card>
-
-      {/* Actions Card */}
-      <Card style={styles.card} mode="elevated">
-        <Card.Content>
-          <Text variant="labelLarge" style={[styles.cardTitle, { color: theme.colors.primary }]}>
-            {t('requests.actions')}
-          </Text>
-          <Divider style={styles.divider} />
-
-          {/* Primary Action Button (Mark Completed) - Always the largest button */}
-          <Button
-            mode="contained"
-            icon="check-circle"
-            style={styles.primaryActionButton}
-            buttonColor={colors.completed}
-            onPress={() => updateStatus('Completed')}
-            loading={updateRequest.isPending}
-            disabled={request.status === 'Completed'}
-            contentStyle={styles.primaryActionButtonContent}
-            labelStyle={styles.primaryActionButtonLabel}
+          <TouchableOpacity
+            style={[styles.copyAmount, { backgroundColor: theme.colors.surfaceVariant }]}
+            onPress={() => copyToClipboard(String(request.amount), 'Amount')}
           >
-            {t('requests.markCompleted')}
+            <MaterialCommunityIcons name="content-copy" size={14} color={theme.colors.onSurfaceVariant} />
+            <Text style={[styles.copyAmountText, { color: theme.colors.onSurfaceVariant }]}>Copy</Text>
+          </TouchableOpacity>
+        </View>
+
+        <Divider style={{ marginVertical: 12 }} />
+
+        {/* Description */}
+        <InfoRow
+          label="Note / Description"
+          value={request.description || '—'}
+          icon="text-box-outline"
+        />
+
+        {/* Created */}
+        <InfoRow
+          label="Requested On"
+          value={createdDisplay}
+          icon="calendar-clock"
+        />
+
+        {/* Completed */}
+        {isCompleted && completedDisplay ? (
+          <InfoRow
+            label="Completed On"
+            value={completedDisplay}
+            icon="check-circle-outline"
+            valueColor={colors.completed}
+          />
+        ) : null}
+      </Surface>
+
+      {/* ── ACTIONS CARD ── */}
+      <Surface style={[styles.card, { backgroundColor: theme.colors.surface }]} elevation={1}>
+        <Text style={[styles.sectionLabel, { color: theme.colors.onSurfaceVariant }]}>
+          ACTIONS
+        </Text>
+
+        {/* Primary action */}
+        <Button
+          mode="contained"
+          icon="check-circle"
+          buttonColor={colors.completed}
+          contentStyle={styles.primaryContent}
+          labelStyle={styles.primaryLabel}
+          style={styles.primaryBtn}
+          onPress={() => updateStatus('Completed')}
+          loading={updateRequest.isPending}
+          disabled={isCompleted}
+        >
+          Mark as Completed
+        </Button>
+
+        {/* Secondary row */}
+        <View style={styles.secondaryRow}>
+          <Button
+            mode="contained-tonal"
+            icon="progress-clock"
+            style={styles.secondaryBtn}
+            buttonColor={colors.processing + '22'}
+            textColor={colors.processing}
+            onPress={() => updateStatus('Processing')}
+            loading={updateRequest.isPending}
+            disabled={isProcessing || isCompleted}
+          >
+            Processing
           </Button>
-
-          <View style={styles.actionGrid}>
-            <Button
-              mode="contained"
-              icon="progress-clock"
-              style={styles.actionGridItem}
-              buttonColor={colors.processing}
-              onPress={() => updateStatus('Processing')}
-              loading={updateRequest.isPending}
-              disabled={request.status === 'Processing' || request.status === 'Completed'}
-            >
-              {t('requests.markProcessing')}
-            </Button>
-
-            <Button
-              mode="outlined"
-              icon="pencil"
-              style={styles.actionGridItem}
-              onPress={() => { setEditDescription(request.description); setEditDialogVisible(true); }}
-            >
-              {t('requests.editDescription')}
-            </Button>
-          </View>
-
-          <View style={styles.actionGrid}>
-            <Button
-              mode="outlined"
-              icon="phone-outline"
-              style={styles.actionGridItem}
-              onPress={() => copyToClipboard(request.buyerPhone)}
-            >
-              {t('requests.copyPhone')}
-            </Button>
-
-            <Button
-              mode="outlined"
-              icon="cash-outline"
-              style={styles.actionGridItem}
-              onPress={() => copyToClipboard(String(request.amount))}
-            >
-              {t('requests.copyAmount')}
-            </Button>
-          </View>
-
           <Button
             mode="outlined"
-            icon="star-outline"
-            style={styles.fullWidthActionBtn}
-            onPress={handleAddToFavorites}
-            loading={createFavorite.isPending}
-            disabled={isFavorited}
+            icon="pencil-outline"
+            style={styles.secondaryBtn}
+            onPress={() => {
+              setEditDescription(request.description || '');
+              setEditDialogVisible(true);
+            }}
           >
-            {t('requests.addToFavorites')}
+            Edit Note
           </Button>
+        </View>
 
-          <Divider style={styles.dividerSpacer} />
+        <Divider style={styles.dangerDivider} />
 
-          <Text variant="labelSmall" style={[styles.dangerHeader, { color: colors.accent }]}>
-            {t('requests.dangerZone')}
-          </Text>
+        {/* Danger zone */}
+        <Text style={[styles.dangerLabel, { color: colors.cancelled }]}>
+          DANGER ZONE
+        </Text>
+        <View style={styles.secondaryRow}>
+          <Button
+            mode="outlined"
+            icon="cancel"
+            style={[styles.secondaryBtn, { borderColor: colors.cancelled }]}
+            textColor={colors.cancelled}
+            onPress={() => setCancelDialogVisible(true)}
+            disabled={isCancelled || isCompleted}
+          >
+            Cancel
+          </Button>
+          <Button
+            mode="contained"
+            icon="delete-outline"
+            style={styles.secondaryBtn}
+            buttonColor={colors.cancelled}
+            onPress={() => setDeleteDialogVisible(true)}
+            loading={deleteRequest.isPending}
+          >
+            Delete
+          </Button>
+        </View>
+      </Surface>
 
-          <View style={styles.actionGrid}>
-            <Button
-              mode="outlined"
-              icon="cancel"
-              style={[styles.actionGridItem, { borderColor: colors.accent }]}
-              textColor={colors.accent}
-              onPress={() => setCancelDialogVisible(true)}
-              disabled={request.status === 'Cancelled' || request.status === 'Completed'}
-            >
-              {t('requests.cancelRequest')}
-            </Button>
-
-            <Button
-              mode="contained"
-              icon="delete"
-              style={styles.actionGridItem}
-              buttonColor={colors.accent}
-              onPress={() => setDeleteDialogVisible(true)}
-              loading={deleteRequest.isPending}
-            >
-              {t('requests.deleteRequest')}
-            </Button>
-          </View>
-        </Card.Content>
-      </Card>
-
-      {/* Dialogs */}
+      {/* ── DIALOGS ── */}
       <Portal>
-        <Dialog visible={editDialogVisible} onDismiss={() => setEditDialogVisible(false)}>
-          <Dialog.Title>{t('requests.editDescription')}</Dialog.Title>
-          <Dialog.Content>
-            <TextInput value={editDescription} onChangeText={setEditDescription} mode="outlined" multiline maxLength={100} />
+        {/* Edit note */}
+        <Dialog
+          visible={editDialogVisible}
+          onDismiss={() => setEditDialogVisible(false)}
+          style={[styles.dialog, { backgroundColor: theme.colors.elevation.level3 }]}
+        >
+          <Dialog.Title>
+            <View style={styles.dialogTitleContainer}>
+              <MaterialCommunityIcons name="note-edit-outline" size={24} color={colors.primary} />
+              <Text style={[styles.dialogTitle, { color: theme.colors.onSurface }]}>Edit Note</Text>
+            </View>
+          </Dialog.Title>
+          <Dialog.Content style={styles.dialogContent}>
+            <TextInput
+              value={editDescription}
+              onChangeText={setEditDescription}
+              mode="outlined"
+              multiline
+              numberOfLines={3}
+              maxLength={100}
+              placeholder="Add a note…"
+              activeOutlineColor={colors.primary}
+            />
           </Dialog.Content>
           <Dialog.Actions>
-            <Button onPress={() => setEditDialogVisible(false)}>{t('common.cancel')}</Button>
-            <Button mode="contained" onPress={handleEditDescription}>{t('common.save')}</Button>
+            <Button onPress={() => setEditDialogVisible(false)} labelStyle={{ color: theme.colors.onSurfaceVariant }}>
+              Cancel
+            </Button>
+            <Button mode="contained" onPress={handleEditDescription} loading={updateRequest.isPending} buttonColor={colors.primary} style={{ borderRadius: 12 }}>
+              Save
+            </Button>
           </Dialog.Actions>
         </Dialog>
 
-        <Dialog visible={deleteDialogVisible} onDismiss={() => setDeleteDialogVisible(false)}>
-          <Dialog.Title>{t('requests.deleteRequest')}</Dialog.Title>
-          <Dialog.Content>
-            <Text variant="bodyMedium">{t('requests.confirmDelete')}</Text>
+        {/* Delete */}
+        <Dialog
+          visible={deleteDialogVisible}
+          onDismiss={() => setDeleteDialogVisible(false)}
+          style={[styles.dialog, { backgroundColor: theme.colors.elevation.level3 }]}
+        >
+          <Dialog.Title>
+            <View style={styles.dialogTitleContainer}>
+              <MaterialCommunityIcons name="delete-alert" size={24} color={colors.cancelled} />
+              <Text style={[styles.dialogTitle, { color: theme.colors.onSurface }]}>Delete Request?</Text>
+            </View>
+          </Dialog.Title>
+          <Dialog.Content style={styles.dialogContent}>
+            <Text variant="bodyMedium" style={{ lineHeight: 20, color: theme.colors.onSurfaceVariant }}>
+              This will permanently remove the request from {phoneFormatted}. This cannot be undone.
+            </Text>
           </Dialog.Content>
           <Dialog.Actions>
-            <Button onPress={() => setDeleteDialogVisible(false)}>{t('common.cancel')}</Button>
-            <Button mode="contained" buttonColor={colors.accent} onPress={handleDelete}>{t('common.delete')}</Button>
+            <Button onPress={() => setDeleteDialogVisible(false)} labelStyle={{ color: theme.colors.onSurfaceVariant }}>
+              Cancel
+            </Button>
+            <Button mode="contained" buttonColor={colors.cancelled} onPress={handleDelete} loading={deleteRequest.isPending} style={{ borderRadius: 12 }}>
+              Delete
+            </Button>
           </Dialog.Actions>
         </Dialog>
 
-        <Dialog visible={cancelDialogVisible} onDismiss={() => setCancelDialogVisible(false)}>
-          <Dialog.Title>{t('requests.cancelRequest')}</Dialog.Title>
-          <Dialog.Content>
-            <Text variant="bodyMedium">{t('requests.confirmCancel')}</Text>
+        {/* Cancel request */}
+        <Dialog
+          visible={cancelDialogVisible}
+          onDismiss={() => setCancelDialogVisible(false)}
+          style={[styles.dialog, { backgroundColor: theme.colors.elevation.level3 }]}
+        >
+          <Dialog.Title>
+            <View style={styles.dialogTitleContainer}>
+              <MaterialCommunityIcons name="close-circle-outline" size={24} color={colors.cancelled} />
+              <Text style={[styles.dialogTitle, { color: theme.colors.onSurface }]}>Cancel Request?</Text>
+            </View>
+          </Dialog.Title>
+          <Dialog.Content style={styles.dialogContent}>
+            <Text variant="bodyMedium" style={{ lineHeight: 20, color: theme.colors.onSurfaceVariant }}>
+              Mark this request from {phoneFormatted} as cancelled?
+            </Text>
           </Dialog.Content>
           <Dialog.Actions>
-            <Button onPress={() => setCancelDialogVisible(false)}>{t('common.cancel')}</Button>
-            <Button mode="contained" onPress={handleCancelRequest}>{t('common.confirm')}</Button>
+            <Button onPress={() => setCancelDialogVisible(false)} labelStyle={{ color: theme.colors.onSurfaceVariant }}>
+              No, Keep It
+            </Button>
+            <Button mode="contained" buttonColor={colors.cancelled} onPress={handleCancelRequest} loading={updateRequest.isPending} style={{ borderRadius: 12 }}>
+              Yes, Cancel
+            </Button>
           </Dialog.Actions>
         </Dialog>
       </Portal>
 
-      <Snackbar visible={!!snackbar} onDismiss={() => setSnackbar('')} duration={2000}>
+      <Snackbar
+        visible={!!snackbar}
+        onDismiss={() => setSnackbar('')}
+        duration={1800}
+        style={{ borderRadius: 12 }}
+      >
         {snackbar}
       </Snackbar>
     </ScrollView>
   );
 }
 
+// ─── Styles ────────────────────────────────────────────────────────────────────
+
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  content: { padding: spacing.md, paddingBottom: spacing.xxl },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: spacing.md },
-  card: {
-    borderRadius: borderRadius.md,
-    marginBottom: spacing.md,
-    overflow: 'hidden',
+  dialog: {
+    borderRadius: 24,
+    paddingVertical: spacing.xs,
   },
-  cardTitle: {
-    fontWeight: '700',
+  dialogTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
     marginBottom: spacing.xs,
   },
-  divider: {
-    marginVertical: spacing.sm,
+  dialogTitle: {
+    fontWeight: '800',
+    fontSize: 20,
+    letterSpacing: 0.3,
   },
-  dividerSpacer: {
-    marginVertical: spacing.md,
+  dialogContent: {
+    paddingTop: spacing.xs,
+    paddingBottom: spacing.sm,
   },
-  customerHeaderRow: {
+  content: { padding: 16, paddingBottom: 48, gap: 12 },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+
+  // Card shell
+  card: {
+    borderRadius: 16,
+    padding: 16,
+    overflow: 'hidden',
+  },
+
+  // Customer card
+  customerTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  customerLeft: { flex: 1 },
+  flagRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 },
+  flag: { fontSize: 20 },
+  phoneNumber: { fontSize: 22, fontWeight: '800', letterSpacing: 0.5 },
+  badgeRow: { flexDirection: 'row', gap: 6 },
+  statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+  },
+  statusBadgeText: { fontSize: 12, fontWeight: '700' },
+  customerActions: { flexDirection: 'row', gap: 8, marginLeft: 12 },
+  iconAction: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    justifyContent: 'center',
     alignItems: 'center',
   },
-  phoneDisplay: {
-    fontWeight: '800',
-    marginTop: spacing.xs,
-  },
-  customerHeaderActions: {
+  idRow: {
     flexDirection: 'row',
-    gap: spacing.xs,
+    alignItems: 'center',
+    gap: 5,
   },
-  requestInfoContent: {
-    paddingVertical: spacing.sm,
+  idText: {
+    fontSize: 11,
+    fontFamily: 'monospace',
+    flex: 1,
+    opacity: 0.7,
   },
-  infoGridRow: {
+
+  // Details card
+  amountRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: spacing.md,
+    alignItems: 'flex-end',
   },
-  infoCell: {
-    flex: 1,
-  },
-  cellLabel: {
-    opacity: 0.6,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: 4,
-  },
-  cellValue: {
-    fontWeight: '800',
-  },
-  statusChip: {
-    alignSelf: 'flex-start',
-  },
-  detailRow: {
-    marginBottom: spacing.sm,
-  },
-  detailLabel: {
-    opacity: 0.6,
+  amountLeft: {},
+  amountLabel: {
+    fontSize: 11,
     fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
     marginBottom: 2,
   },
-  detailValue: {
+  amountValue: {
+    fontSize: 36,
+    fontWeight: '800',
+    letterSpacing: -0.5,
+  },
+  amountUnit: {
+    fontSize: 16,
     fontWeight: '500',
   },
-  detailValueId: {
-    fontFamily: 'monospace',
-    opacity: 0.5,
-  },
-  primaryActionButton: {
-    borderRadius: borderRadius.md,
-    marginBottom: spacing.sm,
-    width: '100%',
-  },
-  primaryActionButtonContent: {
-    height: 54,
-  },
-  primaryActionButtonLabel: {
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  actionGrid: {
+  copyAmount: {
     flexDirection: 'row',
-    gap: spacing.sm,
-    marginBottom: spacing.sm,
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
   },
-  actionGridItem: {
-    flex: 1,
-    borderRadius: borderRadius.sm,
-  },
-  fullWidthActionBtn: {
-    borderRadius: borderRadius.sm,
-    marginBottom: spacing.sm,
-    width: '100%',
-  },
-  dangerHeader: {
+  copyAmountText: { fontSize: 12, fontWeight: '600' },
+
+  // Actions card
+  sectionLabel: {
+    fontSize: 11,
     fontWeight: '700',
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: spacing.sm,
+    letterSpacing: 0.8,
+    marginBottom: 12,
+  },
+  primaryBtn: {
+    borderRadius: 12,
+    marginBottom: 10,
+  },
+  primaryContent: { height: 52 },
+  primaryLabel: { fontSize: 15, fontWeight: '700' },
+  secondaryRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 8,
+  },
+  secondaryBtn: {
+    flex: 1,
+    borderRadius: 10,
+  },
+  dangerDivider: { marginVertical: 14 },
+  dangerLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    marginBottom: 10,
   },
 });

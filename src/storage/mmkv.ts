@@ -86,4 +86,10 @@ export const StorageKeys = {
   OFFLINE_QUEUE: 'offline_queue',
   PIN_VERIFIED_SESSION: 'pin_verified_session',
   LATEST_REQUEST: 'latest_request',
+  API_KEY: 'api_key',
+  API_URL: 'api_url',
+  PIN_ATTEMPTS: 'pin_attempts',
+  PIN_LOCKOUT: 'pin_lockout',
+  SETUP_COMPLETE: 'setup_complete',
+  LOG: 'app_log',
 } as const;

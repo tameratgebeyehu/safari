@@ -15,7 +15,9 @@
     "offline": "ኦፍላይን",
     "noData": "መረጃ የለም",
     "confirm": "አረጋግጥ",
-    "back": "ተመለስ"
+    "back": "ተመለስ",
+    "clear": "አጽዳ",
+    "currency": "ብር"
   },
   "welcome": {
     "title": "ወደ ሳፋሪ ኤ እንኳን በደህና መጡ",
@@ -27,14 +29,11 @@
     "continue": "ቀጥል"
   },
   "sender": {
-    "greetingMorning": "እንደምን አደሩ! ጥያቄ ለመላክ ዝግጁ ናቸው?",
-    "greetingAfternoon": "ደህና ሰፈሩ! ጥያቄ ለመላክ ዝግጁ ናቸው?",
-    "greetingEvening": "እንደምን ዋሉ! ጥያቄ ለመላክ ዝግጁ ናቸው?",
-    "greeting": "ሰላም! ጥያቄ ለመላክ ዝግጁ ናቸው?",
     "phoneLabel": "የገዢ ስልክ ቁጥር",
-    "phonePlaceholder": "09XX XXX XXXX",
+    "phonePlaceholder": "07XX XXX XXX",
     "phoneError": "ትክክለኛ የኢትዮጵያ ስልክ ቁጥር ያስገቡ",
     "amountLabel": "መጠን",
+    "amountHint": "መጠን በETB ያስገቡ",
     "amountError": "ትክክለኛ መጠን ያስገቡ",
     "descriptionLabel": "መግለጫ (አማራጭ)",
     "descriptionPlaceholder": "ለምሳሌ ቡና ቮቸር",
@@ -45,11 +44,21 @@
     "savedOffline": "ተቀምጧል — ኦንላይን ሲሆኑ ይላካል",
     "clearFields": "ሁሉም መስኮች ተጸድቀዋል",
     "latestRequest": "የመጨረሻ ጥያቄ ሁኔታ",
-    "notificationCompleted": "✅ ጥያቄ ተጠናቋል",
-    "notificationProcessing": "🔵 ጥያቄዎ በሂደት ላይ ነው።",
-    "notificationCancelled": "❌ ጥያቄዎ ተሰርዟል።",
+    "notificationCompleted": "ጥያቄ ተጠናቋል",
+    "notificationProcessing": "ጥያቄዎ በሂደት ላይ ነው።",
+    "notificationCancelled": "ጥያቄዎ ተሰርዟል።",
     "historyTitle": "የተላኩ ጥያቄዎች",
-    "historyEmpty": "እስካሁን የተላኩ ጥያቄዎች የሉም"
+    "historyEmpty": "እስካሁን ጥያቄ አልተላከም",
+    "historyEmptySub": "ጥያቄ ሲልኩ እዚህ ይታያሉ",
+    "historySearch": "በስልክ ቁጥር ወይም መግለጫ ፈልግ...",
+    "historyFilter": "አጣራ",
+    "historyAll": "ሁሉም",
+    "today": "ዛሬ",
+    "yesterday": "ትላንት",
+    "thisWeek": "በዚህ ሳምንት",
+    "earlier": "ቀደም ሲል",
+    "latestStatus": "የቅርብ ጥያቄ",
+    "clearBtn": "አጽዳ"
   },
   "pin": {
     "title": "PIN ያስገቡ",
@@ -90,9 +99,13 @@
     "secondsAgo": "ሰከንድ በፊት",
     "minutesAgo": "ደቂቃ በፊት",
     "newRequest": "አዲስ ጥያቄ ደርሷል",
+    "newRequestNotifTitle": "አዲስ ጥያቄ ደርሷል",
     "requestCompleted": "ጥያቄ ተጠናቋል",
+    "requestCompletedTitle": "ጥያቄ ተጠናቋል",
     "requestProcessing": "ጥያቄ በሂደት ላይ ነው",
+    "requestProcessingTitle": "ጥያቄ በሂደት",
     "requestCancelled": "ጥያቄ ተሰርዟል",
+    "requestCancelledTitle": "ጥያቄ ተሰርዟል",
     "requestRemoved": "ጥያቄ ተወግዷል",
     "connectionRestored": "ወደ መስመር ተመልሷል",
     "syncFailed": "ማመሳሰል አልተሳካም",
@@ -183,6 +196,11 @@
     "account": "መለያ",
     "switchMode": "ሁነታ ቀይር",
     "switchModeConfirm": "ሁነታ ለቀይር ይፈልጋሉ? ወደ ምርጫ ማያ ይመለሳሉ።"
+  },
+  "time": {
+    "morning": "ጠዋት",
+    "afternoon": "ከሰዓት",
+    "night": "ሌሊት"
   },
   "tabs": {
     "dashboard": "ዳሽቦርድ",

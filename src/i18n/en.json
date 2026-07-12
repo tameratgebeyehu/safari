@@ -15,7 +15,9 @@
     "offline": "Offline",
     "noData": "No data available",
     "confirm": "Confirm",
-    "back": "Back"
+    "back": "Back",
+    "clear": "Clear",
+    "currency": "ETB"
   },
   "welcome": {
     "title": "Welcome to Safari A",
@@ -27,14 +29,11 @@
     "continue": "Continue"
   },
   "sender": {
-    "greetingMorning": "Good morning! Ready to send a request?",
-    "greetingAfternoon": "Good afternoon! Ready to send a request?",
-    "greetingEvening": "Good evening! Ready to send a request?",
-    "greeting": "Hello! Ready to send a request?",
     "phoneLabel": "Buyer Phone Number",
-    "phonePlaceholder": "09XX XXX XXXX",
+    "phonePlaceholder": "07XX XXX XXX",
     "phoneError": "Please enter a valid Ethiopian phone number",
     "amountLabel": "Amount",
+    "amountHint": "Enter amount in ETB",
     "amountError": "Please enter a valid amount",
     "descriptionLabel": "Description (Optional)",
     "descriptionPlaceholder": "e.g. Coffee Voucher",
@@ -45,11 +44,21 @@
     "savedOffline": "Saved — will send when online",
     "clearFields": "All fields cleared",
     "latestRequest": "Latest Request Status",
-    "notificationCompleted": "✅ Request Completed",
-    "notificationProcessing": "🔵 Your request is now being processed.",
-    "notificationCancelled": "❌ Your request was cancelled.",
+    "notificationCompleted": "Request Completed",
+    "notificationProcessing": "Your request is now being processed.",
+    "notificationCancelled": "Your request was cancelled.",
     "historyTitle": "Sent Requests",
-    "historyEmpty": "No sent requests yet"
+    "historyEmpty": "No requests sent yet",
+    "historyEmptySub": "Requests you send will appear here",
+    "historySearch": "Search by phone or description...",
+    "historyFilter": "Filter",
+    "historyAll": "All",
+    "today": "Today",
+    "yesterday": "Yesterday",
+    "thisWeek": "This Week",
+    "earlier": "Earlier",
+    "latestStatus": "Latest Request",
+    "clearBtn": "Clear"
   },
   "pin": {
     "title": "Enter PIN",
@@ -90,9 +99,13 @@
     "secondsAgo": "seconds ago",
     "minutesAgo": "minutes ago",
     "newRequest": "New request received",
+    "newRequestNotifTitle": "New Request Received",
     "requestCompleted": "Request completed",
+    "requestCompletedTitle": "Request Completed",
     "requestProcessing": "Request is being processed",
+    "requestProcessingTitle": "Request Processing",
     "requestCancelled": "Request cancelled",
+    "requestCancelledTitle": "Request Cancelled",
     "requestRemoved": "Request removed",
     "connectionRestored": "Back online",
     "syncFailed": "Sync failed",
@@ -183,6 +196,11 @@
     "account": "Account",
     "switchMode": "Switch Mode",
     "switchModeConfirm": "Are you sure you want to switch modes? You will be taken back to the mode selection screen."
+  },
+  "time": {
+    "morning": "Morning",
+    "afternoon": "Afternoon",
+    "night": "Night"
   },
   "tabs": {
     "dashboard": "Dashboard",

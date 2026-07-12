@@ -43,19 +43,18 @@ function getRequests() {
 }
 
 function rowToRequest(row) {
-  // isoTimestamp is col 11 (index 10); fall back to lastUpdated for legacy rows
-  var iso = row[10] ? String(row[10]) : String(row[9]);
+  var iso = row[10] ? cleanString(row[10], 'iso') : cleanString(row[9], 'iso');
   return {
     requestId:     String(row[0]),
     buyerPhone:    String(row[1]),
     amount:        Number(row[2]),
     description:   String(row[3] || ''),
     status:        String(row[4]),
-    createdDate:   String(row[5]),
-    createdTime:   String(row[6]),
-    completedDate: row[7] ? String(row[7]) : '',
-    completedTime: row[8] ? String(row[8]) : '',
-    lastUpdated:   String(row[9]),
+    createdDate:   cleanString(row[5], 'date'),
+    createdTime:   cleanString(row[6], 'time'),
+    completedDate: row[7] ? cleanString(row[7], 'date') : '',
+    completedTime: row[8] ? cleanString(row[8], 'time') : '',
+    lastUpdated:   cleanString(row[9], 'iso'),
     isoTimestamp:  iso,
   };
 }

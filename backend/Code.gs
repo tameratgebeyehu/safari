@@ -141,3 +141,18 @@ function getSheet(name) {
   }
   return sheet;
 }
+
+function cleanString(val, type) {
+  if (!val) return '';
+  if (val instanceof Date) {
+    if (type === 'date') {
+      return Utilities.formatDate(val, Session.getScriptTimeZone(), "yyyy-MM-dd");
+    } else if (type === 'time') {
+      return Utilities.formatDate(val, Session.getScriptTimeZone(), "HH:mm:ss");
+    } else {
+      return val.toISOString();
+    }
+  }
+  return String(val);
+}
+

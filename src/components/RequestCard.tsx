@@ -1,7 +1,6 @@
 import React from 'react';
 import { StyleSheet, View, Pressable } from 'react-native';
-import { Chip, Text, useTheme } from 'react-native-paper';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { Text, useTheme } from 'react-native-paper';
 import type { Request } from '../api/types';
 import { formatPhoneDisplay } from '../utils/phone';
 import { getStatusColor } from '../utils/requestHelpers';
@@ -13,11 +12,19 @@ interface RequestCardProps {
   onPress: () => void;
 }
 
+const STATUS_EMOJI: Record<string, string> = {
+  Pending: '🟡',
+  Processing: '🔵',
+  Completed: '🟢',
+  Cancelled: '🔴',
+};
+
 export function RequestCard({ request, onPress }: RequestCardProps) {
   const theme = useTheme();
   const { t } = useTranslation();
   const statusKey = `requests.status${request.status}` as const;
   const statusColor = getStatusColor(request.status);
+  const emoji = STATUS_EMOJI[request.status] ?? '';
 
   return (
     <Pressable
@@ -26,71 +33,43 @@ export function RequestCard({ request, onPress }: RequestCardProps) {
         styles.card,
         {
           backgroundColor: theme.colors.surface,
-          borderColor: theme.colors.outline + '30',
-          opacity: pressed ? 0.94 : 1,
+          borderColor: theme.colors.outline + '25',
+          opacity: pressed ? 0.92 : 1,
         },
       ]}
     >
-      {/* Left color strip */}
-      <View style={[styles.strip, { backgroundColor: statusColor }]} />
-
-      <View style={styles.body}>
-        {/* Top row: info + amount */}
-        <View style={styles.topRow}>
-          <View style={styles.info}>
-            <View style={styles.phoneRow}>
-              <MaterialCommunityIcons name="phone" size={14} color={theme.colors.onSurfaceVariant} />
-              <Text variant="titleSmall" style={[styles.phone, { color: theme.colors.onSurface }]}>
-                {formatPhoneDisplay(request.buyerPhone)}
-              </Text>
-            </View>
-            {request.description ? (
-              <Text
-                variant="bodySmall"
-                numberOfLines={1}
-                style={[styles.description, { color: theme.colors.onSurfaceVariant }]}
-              >
-                {request.description}
-              </Text>
-            ) : null}
-            <View style={styles.dateRow}>
-              <MaterialCommunityIcons name="calendar-outline" size={12} color={theme.colors.onSurfaceVariant} />
-              <Text variant="labelSmall" style={{ color: theme.colors.onSurfaceVariant, marginLeft: 3, opacity: 0.7 }}>
-                {request.createdDate} · {request.createdTime}
-              </Text>
-            </View>
-          </View>
-
-          <View style={styles.amountBlock}>
-            <Text variant="titleLarge" style={[styles.amount, { color: theme.colors.primary }]}>
-              {request.amount}
-            </Text>
-            <Text variant="labelSmall" style={{ color: theme.colors.onSurfaceVariant, textAlign: 'right' }}>
-              ETB
-            </Text>
-          </View>
-        </View>
-
-        {/* Bottom row: chips */}
-        <View style={styles.chipRow}>
-          <Chip
-            compact
-            style={[styles.chip, { backgroundColor: statusColor + '18' }]}
-            textStyle={{ color: statusColor, fontSize: 11, fontWeight: '700' }}
-          >
-            {t(statusKey)}
-          </Chip>
-          {request.pendingSync ? (
-            <Chip compact icon="cloud-upload-outline" style={styles.syncChip} textStyle={{ fontSize: 10 }}>
-              Pending sync
-            </Chip>
-          ) : null}
-        </View>
-
-        {/* Request ID */}
-        <Text variant="labelSmall" style={[styles.requestId, { color: theme.colors.onSurfaceVariant }]}>
-          {request.requestId}
+      {/* Left: phone, description, date */}
+      <View style={styles.left}>
+        <Text variant="titleSmall" style={[styles.phone, { color: theme.colors.onSurface }]}>
+          {formatPhoneDisplay(request.buyerPhone)}
         </Text>
+        {request.description ? (
+          <Text
+            variant="bodySmall"
+            numberOfLines={1}
+            style={[styles.description, { color: theme.colors.onSurfaceVariant }]}
+          >
+            {request.description}
+          </Text>
+        ) : null}
+        <Text variant="labelSmall" style={[styles.date, { color: theme.colors.onSurfaceVariant }]}>
+          {request.createdDate} · {request.createdTime}
+        </Text>
+      </View>
+
+      {/* Right: amount + status pill */}
+      <View style={styles.right}>
+        <Text variant="titleMedium" style={[styles.amount, { color: theme.colors.primary }]}>
+          {request.amount}{' '}
+          <Text variant="labelSmall" style={{ color: theme.colors.onSurfaceVariant }}>
+            ETB
+          </Text>
+        </Text>
+        <View style={[styles.statusPill, { backgroundColor: statusColor + '18' }]}>
+          <Text style={[styles.statusText, { color: statusColor }]}>
+            {emoji} {t(statusKey)}
+          </Text>
+        </View>
       </View>
     </Pressable>
   );
@@ -102,72 +81,40 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.md,
     borderWidth: 1,
     flexDirection: 'row',
-    overflow: 'hidden',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  strip: {
-    width: 4,
-    alignSelf: 'stretch',
-  },
-  body: {
-    flex: 1,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.md,
-  },
-  topRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-  },
-  info: {
-    flex: 1,
-    marginRight: spacing.sm,
-  },
-  phoneRow: {
-    flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    marginBottom: 3,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+    gap: spacing.md,
+  },
+  left: {
+    flex: 1,
+    gap: 3,
   },
   phone: {
     fontWeight: '700',
   },
   description: {
-    marginBottom: 4,
+    opacity: 0.8,
   },
-  dateRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 2,
+  date: {
+    opacity: 0.55,
+    fontSize: 11,
   },
-  amountBlock: {
+  right: {
     alignItems: 'flex-end',
+    gap: 6,
+    flexShrink: 0,
   },
   amount: {
     fontWeight: '800',
-    lineHeight: 30,
   },
-  chipRow: {
-    flexDirection: 'row',
-    gap: spacing.xs,
-    marginTop: spacing.sm,
-    flexWrap: 'wrap',
+  statusPill: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
   },
-  chip: {
-    alignSelf: 'flex-start',
-    height: 24,
-  },
-  syncChip: {
-    alignSelf: 'flex-start',
-    height: 24,
-  },
-  requestId: {
-    marginTop: spacing.sm,
-    opacity: 0.35,
-    fontFamily: 'monospace',
-    fontSize: 10,
+  statusText: {
+    fontSize: 11,
+    fontWeight: '700',
   },
 });

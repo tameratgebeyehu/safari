@@ -10,10 +10,10 @@ function validatePhone(phone) {
   if (normalized.indexOf('251') === 0 && normalized.length === 12) {
     normalized = '0' + normalized.slice(3);
   }
-  if (normalized.indexOf('9') === 0 && normalized.length === 9) {
+  if ((normalized.indexOf('9') === 0 || normalized.indexOf('7') === 0) && normalized.length === 9) {
     normalized = '0' + normalized;
   }
-  return /^09\d{8}$/.test(normalized);
+  return /^(09|07)\d{8}$/.test(normalized);
 }
 
 function normalizePhone(phone) {
@@ -21,10 +21,10 @@ function normalizePhone(phone) {
   if (normalized.indexOf('251') === 0 && normalized.length === 12) {
     return '0' + normalized.slice(3);
   }
-  if (normalized.indexOf('9') === 0 && normalized.length === 9) {
+  if ((normalized.indexOf('9') === 0 || normalized.indexOf('7') === 0) && normalized.length === 9) {
     return '0' + normalized;
   }
-  if (normalized.indexOf('09') === 0 && normalized.length === 10) {
+  if ((normalized.indexOf('09') === 0 || normalized.indexOf('07') === 0) && normalized.length === 10) {
     return normalized;
   }
   return normalized;

@@ -61,6 +61,7 @@ export default function ReceiverTabsLayout() {
         name="dashboard"
         options={{
           title: t('tabs.dashboard'),
+          headerShown: false,
           tabBarIcon: ({ color, size, focused }) => (
             <MaterialCommunityIcons
               name={focused ? TAB_ICONS.dashboard.focused : TAB_ICONS.dashboard.default}
@@ -130,7 +131,7 @@ export default function ReceiverTabsLayout() {
 
 const styles = StyleSheet.create({
   badge: {
-    backgroundColor: colors.accent,
+    backgroundColor: colors.cancelled,
     fontSize: 10,
     fontWeight: '700',
     minWidth: 18,
