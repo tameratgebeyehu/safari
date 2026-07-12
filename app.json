@@ -38,15 +38,7 @@
       "expo-router",
       "expo-localization",
       "expo-asset",
-      "expo-secure-store",
-      [
-        "expo-notifications",
-        {
-          "icon": "./assets/icon.png",
-          "color": "#2E7D32",
-          "defaultChannel": "default"
-        }
-      ]
+      "expo-secure-store"
     ],
     "experiments": {
       "typedRoutes": true
