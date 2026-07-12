@@ -51,5 +51,12 @@
     "experiments": {
       "typedRoutes": true
     },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "ef50e6a4-602a-4b63-9c0b-9ce1227ccdab"
+      }
+    },
+    "owner": "tamerat"
   }
 }
