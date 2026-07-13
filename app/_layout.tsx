@@ -16,7 +16,7 @@ import { useAutoSync } from '../src/hooks/useAutoSync';
 import { initNotifications } from '../src/services/NotificationService';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
-initI18n();
+
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -179,21 +179,25 @@ function NotificationOverlay() {
   );
 }
 
+try { initI18n(); } catch (e) { console.error('[initI18n crash]', e); }
+
 export default function RootLayout() {
   return (
-    <SafeAreaProvider>
-      <QueryClientProvider client={queryClient}>
-        <AppProviders>
-          <SyncBootstrap />
-          <Stack screenOptions={{ headerShown: false }}>
-            <Stack.Screen name="index" />
-            <Stack.Screen name="sender" />
-            <Stack.Screen name="receiver" />
-          </Stack>
-          <NotificationOverlay />
-        </AppProviders>
-      </QueryClientProvider>
-    </SafeAreaProvider>
+    <ErrorBoundary>
+      <SafeAreaProvider>
+        <QueryClientProvider client={queryClient}>
+          <AppProviders>
+            <SyncBootstrap />
+            <Stack screenOptions={{ headerShown: false }}>
+              <Stack.Screen name="index" />
+              <Stack.Screen name="sender" />
+              <Stack.Screen name="receiver" />
+            </Stack>
+            <NotificationOverlay />
+          </AppProviders>
+        </QueryClientProvider>
+      </SafeAreaProvider>
+    </ErrorBoundary>
   );
 }
 
