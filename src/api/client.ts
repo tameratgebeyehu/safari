@@ -27,6 +27,9 @@ async function fetchWithTimeout(
 }
 
 function buildUrl(action: string, params?: Record<string, string>): string {
+  // Guard: if API_URL is empty (e.g. env vars not injected), return '' safely
+  // This prevents a TypeError crash at module load time in standalone builds
+  if (!API_URL) return '';
   const url = new URL(API_URL);
   url.searchParams.set('action', action);
   if (API_KEY) {
